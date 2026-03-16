@@ -21,6 +21,12 @@ maintaining them.
 - Confirmed intermediate steps belong in `ROADMAP.md`.
 - Completed changes belong in `CHANGELOG.md`.
 
+## Changelog Rules
+
+- `CHANGELOG.md` is append-only.
+- Add new entries; do not rewrite prior history except to correct clear factual
+  errors.
+
 ## Roadmap Rules
 
 - `ROADMAP.md` is a live checklist, not a historical record.

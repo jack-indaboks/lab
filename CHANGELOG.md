@@ -1,6 +1,6 @@
 # Lab Changelog
 
-## 2026-03-16
+## 2026-03-13
 
 - established the initial `lab` repository shape
 - renamed the project from `Harness` to `lab`
@@ -11,6 +11,10 @@
 - documented the intended `ai-lab plan` and `ai-lab run` lifecycle
 - added a lean `.gitignore`
 - marked the current agent prompts as placeholder drafts
+*Commit: 750b370 init*
+
+## 2026-03-16
+
 - clarified the roles of `README.md`, `DESIGN.md`, `ROADMAP.md`, and `CHANGELOG.md`
 - refined `README.md` toward current-state and usage guidance
 - refined `DESIGN.md` toward end-state architecture only
@@ -18,3 +22,15 @@
 - added and refined the `Open Questions` section in `ROADMAP.md`
 - added `DOCS.md` as the maintainer-facing home for document rules and update discipline
 - moved maintainer-facing meta guidance out of the public-facing project documents
+*Commit: f775ebe DOCS*
+
+- replaced `sprint` terminology with `brief`, `run`, `loop`, and `report`
+- removed the obsolete `templates/sprint/` scaffold
+- added `templates/run/` as the canonical run-record scaffold
+- documented the run contract, invocation contract, execution loop, and auditability requirements in `DESIGN.md`
+- documented isolated repo-modifying execution checkouts under `.ai-lab/benches/`
+- added `mode` and `bench` fields to the run metadata template
+- removed the literal `templates/run/` scaffold and made wrapper-created run records the only source of run structure
+- made `DESIGN.md` fully capture the top-level `.ai-lab` contract and wrapper-created versus runtime-created run artifacts
+- added an explicit `.ai-lab` directory layout and creation-timing spec to `DESIGN.md`
+- marked `CHANGELOG.md` as append-only in `DOCS.md`

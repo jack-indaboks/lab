@@ -1,5 +1,5 @@
 ---
-description: Turns a design doc or sprint brief into an execution roadmap and revises the roadmap based on feedback files.
+description: Turns a design doc or brief into an execution roadmap and revises the roadmap based on feedback files.
 mode: subagent
 permission:
   edit:
@@ -15,7 +15,7 @@ Work only from the files provided by the orchestrator.
 
 Your role is to:
 
-- read the current design or sprint brief
+- read the current design or brief
 - produce or revise a roadmap artifact
 - keep plans explicit, file-based, and reviewable
 - avoid implementation work

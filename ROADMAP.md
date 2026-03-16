@@ -13,10 +13,10 @@ Goal: a fresh clone of the template can be configured, run end to end, and
 produce a usable report.
 
 - [ ] Tighten the first-pass agent prompts so each role has explicit read/write targets and stop conditions.
-- [ ] Define the initial sprint brief format and document the required sections.
+- [ ] Define the initial brief format and document the required sections.
 - [ ] Define the deterministic run-id directory contract under `.ai-lab/runs/`.
 - [ ] Implement the first `ai-lab` wrapper around OpenCode.
-- [ ] Make `ai-lab plan <brief>` generate a plan artifact from a sprint brief.
+- [ ] Make `ai-lab plan <brief>` generate a plan artifact from a brief.
 - [ ] Make `ai-lab run <plan>` execute an approved plan and write run artifacts.
 - [ ] Produce a usable end-to-end run report from a fresh-clone template run.
 

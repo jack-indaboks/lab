@@ -17,7 +17,7 @@ Your role is to complete one scoped assignment from the orchestrator.
 Default posture:
 
 - work narrowly
-- keep outputs in designated sprint locations
+- keep outputs in designated run locations
 - avoid unrelated changes
 - produce a concise artifact describing what was done
 

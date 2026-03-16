@@ -8,10 +8,10 @@ This document describes the intended final design of the Lab system.
 
 Provide a file-native agent execution environment where:
 
-- input begins with a sprint brief
+- input begins with a brief
 - Lab generates an executable plan from that brief
 - execution happens through a runtime binding
-- the workspace remains the canonical home for sprint state, logs, artifacts,
+- the workspace remains the canonical home for run state, logs, artifacts,
   and reports
 - an orchestrator agent provisions specialized subagents as needed
 - most agents work only with files, while a smaller set may use tools or
@@ -34,20 +34,23 @@ The workspace is the canonical shared state surface.
 Examples of state stored in the workspace:
 
 - design docs
-- sprint briefs
+- briefs
 - roadmaps
 - prompts and context files
 - logs
 - validation outputs
 - reports
 
-The workspace is not a transient cache. It is the persistent record of a sprint.
+The workspace is not a transient cache. It is the persistent record of a run.
 
 In project instances, this design assumes a three-part split:
 
 - canonical Lab source
 - runtime-specific binding
 - generated project-local Lab runtime state
+
+For repo-modifying runs, project-local isolated execution checkouts should live
+under `.ai-lab/benches/`.
 
 The naming model is:
 
@@ -56,9 +59,11 @@ The naming model is:
   which may live in a project, in home config, as a symlink, or as a direct
   clone
 - `.ai-lab`: generated run state inside the project being worked on
+- `.ai-lab/benches/<run-id>/`: isolated execution checkout for a run that
+   modifies project files
 
-Runtime state should use deterministic run-id-based subdirectories, typically
-including an ISO-like date or timestamp component.
+Runtime state should use deterministic run-id-based subdirectories in the form
+`YYYY-MM-DD-HH-MM_slug`, using a local timestamp without a timezone suffix.
 
 ## Runtime Role
 
@@ -68,7 +73,7 @@ The runtime binding is responsible for:
 - running the orchestrator agent
 - allowing the orchestrator agent to invoke specialized subagents
 - enforcing per-agent permissions and tool access
-- carrying out unattended execution once a sprint is approved for run
+- carrying out unattended execution once a plan is approved for run
 
 The runtime binding is an instance projection, not the canonical source of Lab
 behavior.
@@ -77,13 +82,124 @@ The location of that projection is flexible.
 
 The location of `.ai-lab` is not: it belongs in the project being operated on.
 
+## .ai-lab Contract
+
+`.ai-lab/` is the generated runtime surface for a Lab-operated project.
+
+Expected structure:
+
+```text
+.ai-lab/
+   runs/                          # canonical run records
+      <run-id>/
+         run.json                   # top-level run metadata and mode
+         timeline.ndjson            # ordered audit events
+         brief.md                   # run input
+         plan.md                    # approved execution plan
+         report.md                  # final human review report
+         orchestrator/              # orchestrator logs and status
+         loops/                     # iterative worker and validator attempts
+            loop-001/
+               worker-001/
+               validator-001/
+            loop-002/
+               worker-001/
+               validator-001/
+   benches/                       # isolated execution checkouts for repo-modifying runs
+      <run-id>/
+```
+
+Creation rules:
+
+- the wrapper creates `.ai-lab/`, `.ai-lab/runs/`, `.ai-lab/runs/<run-id>/`,
+   `run.json`, and `timeline.ndjson`
+- the wrapper creates `.ai-lab/benches/<run-id>/` only when a run needs an
+   isolated repo-modifying checkout
+- the brief and plan must exist before execution begins
+- the orchestrator creates `orchestrator/`, `loops/`, loop directories, and
+   per-invocation directories as execution proceeds
+- the reporter creates `report.md`
+
+## Run Contract
+
+Each Lab run should create a deterministic run directory under
+`.ai-lab/runs/<run-id>/`.
+
+The run directory is the canonical record of that run.
+
+The minimum run contract is:
+
+- `brief.md`: the brief given to Lab
+- `plan.md`: the executable plan generated from the brief
+- `run.json`: run metadata and top-level status
+- `timeline.ndjson`: ordered run events for auditability
+- `report.md`: final human review report
+- `orchestrator/`: orchestrator logs and status
+- `loops/`: iterative worker and validator attempts
+
+The wrapper should create the run directory itself and initialize the top-level
+artifacts that exist before planning or execution begins.
+
+At minimum, wrapper-created run artifacts are:
+
+- `run.json`
+- `timeline.ndjson`
+
+Other top-level artifacts are created during the run lifecycle:
+
+- `brief.md`: created or copied in when a brief is provided
+- `plan.md`: created during planning
+- `report.md`: created during reporting
+
+Role-specific directories such as `orchestrator/` and `loops/` should be
+created dynamically according to the directory layout and creation timing rules
+above.
+
+The run contract should preserve enough information to answer at least these
+questions after the fact:
+
+- how many agent instances were invoked
+- in what order they were invoked
+- which artifacts and logs were produced by each invocation
+- which validation result corresponded to which worker attempt
+- why a loop continued, retried, or stopped
+
+For runs that modify project files, the run record should also identify the
+corresponding bench and whether the run operated in artifact-only or
+repo-modifying mode.
+
+For artifact-only runs, no bench is required.
+
+## Invocation Contract
+
+Each agent invocation should have its own directory and must not overwrite a
+previous invocation of the same role.
+
+At minimum, each invocation should preserve:
+
+- the agent role or type
+- the task-specific prompt used for that invocation
+- the input artifact references or copies needed for that invocation
+- a log file for that invocation
+- any output artifacts created by that invocation
+- a status message or status file returned to the orchestrator
+
+This applies to worker and validator invocations alike.
+
+The orchestrator may revise prompts between loops, but each revised invocation
+must remain separately inspectable.
+
+The invocation layout should follow the `.ai-lab` directory rules defined
+above.
+
 ## Agent Model
 
 The orchestrator is itself an agent.
 
 The orchestrator agent is expected to:
 
-- read the sprint definition from workspace files
+- read the brief and plan files from workspace state
+- generate the executable plan artifact
 - decide which specialized agents to invoke
 - delegate work to those agents
 - collect outputs
@@ -118,8 +234,8 @@ Sandboxed execution is optional and role-dependent, not universal.
 Specialized agent definitions should be defined once and reused where useful,
 but different project instances may carry materially different agent rosters.
 
-Project work should keep sprint-specific state local to the workspace, while
-shared patterns and templates can live in repo-owned canon.
+Project work should keep run-specific state local to the workspace, while
+shared patterns and definitions can live in repo-owned canon.
 
 This design prefers repo-owned canon with disposable live instances.
 
@@ -130,12 +246,25 @@ repo should remain the canonical home for the portable parts of the system.
 
 The design is:
 
-- a sprint brief is provided
+- a brief is provided
 - Lab produces the executable plan
 - execution runs from the approved plan
 
 Planning may be implemented as behavior of the orchestrator or as a dedicated
 planning role.
+
+## Execution Loop
+
+The intended loop is:
+
+1. the orchestrator provisions a worker invocation with role instructions,
+   task-specific prompt, and required input artifacts
+2. the worker produces a log, output artifacts, and a status result
+3. the orchestrator provisions a validator invocation against the worker output
+4. the validator produces a log, validation result, and a status result
+5. if validation fails and retry conditions allow it, the orchestrator updates
+   the next worker prompt and begins a new loop without overwriting prior loops
+6. when completion criteria are met, the reporter produces the final report
 
 ## Execution Isolation
 
@@ -145,16 +274,19 @@ Where agents need real execution capability, each parallel execution unit should
 have its own isolated working area and should write logs and artifacts only to
 its designated output locations.
 
+For repo-modifying runs, the preferred isolated working area is a run-specific
+bench under `.ai-lab/benches/<run-id>/`.
+
 ## Review Flow
 
 The high-level flow is:
 
-1. A sprint brief is provided to Lab.
+1. A brief is provided to Lab.
 2. Lab generates an executable plan from that brief.
 3. The plan is reviewed.
 4. Lab executes the approved plan using subagents as needed.
 5. Preserve logs, artifacts, and validation outputs in the workspace.
-6. Produce a final sprint report for review.
+6. Produce a final report for review.
 
 ## Open Questions
 

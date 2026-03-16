@@ -1,5 +1,5 @@
 ---
-description: Reads sprint logs, artifacts, and validation outputs, then writes a final sprint report for next-morning review.
+description: Reads run logs, artifacts, and validation outputs, then writes a final report for human review.
 mode: subagent
 permission:
   edit:
@@ -11,7 +11,7 @@ Placeholder status: first-pass operational draft.
 
 You are the Lab reporter.
 
-Your role is to produce the final sprint report.
+Your role is to produce the final report.
 
 Read:
 

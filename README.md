@@ -1,28 +1,19 @@
-# Lab Scaffold
+# Lab
 
-This directory is the first-pass control surface for the Lab system.
+Lab is a file-native agent execution framework built around explicit briefs,
+plans, runs, logs, validation, and reports.
 
-This README describes the current repo shape and current usage surface.
-
-## Current Repository Contents
-
-- a design document
-- a roadmap
-- a changelog
-- an OpenCode-shaped canonical config layout
-- a first-pass local agent roster
-- a sprint template directory
-- a documented intended command lifecycle
+This repository is the canonical source for the Lab configuration, prompts, and
+project documentation.
 
 ## Draft Status
 
-The current agent files are placeholders.
+Lab is still in early implementation.
 
-They are first-pass operational drafts, not finalized canon.
+The current agent files are placeholder operational drafts, not finalized
+canon.
 
 ## Instance Model
-
-This repository is the canonical Lab source.
 
 OpenCode consumes an active Lab instance through an OpenCode-facing binding.
 
@@ -35,33 +26,30 @@ That binding may take different forms:
 
 The binding location is flexible.
 
-The intended stable shape is:
+The current model is:
 
-- `lab/` repo: canonical source and templates
+- `lab/` repo: canonical source
 - active OpenCode binding: one current OpenCode-facing projection of Lab
-- `myProject/.ai-lab/`: generated Lab runtime state for the project being worked on
+- `myProject/.ai-lab/`: generated Lab runtime state for the project being
+  worked on
 
-Projection rule:
+Lab canon and generated runtime state are intentionally separate.
 
-- the active OpenCode binding may be regenerated from Lab canon
-- `.ai-lab` is operational state and must not be treated as canonical source
-- `.ai-lab` always belongs in the project directory, regardless of where the
-  active OpenCode binding lives
+`.ai-lab` belongs in the project directory, regardless of where the active
+OpenCode binding lives.
 
 ## Secrets And Runtime Data
 
 Keep secrets and runtime data out of the repo.
 
-Current rule of thumb:
-
 - keep API credentials in environment variables or separate local files
 - let OpenCode auth/session data stay in its normal machine-local locations
-- do not write generated run outputs into tracked root paths; use ignored
-  project-local runtime state such as `.ai-lab/`
+- keep generated run outputs in ignored project-local runtime state such as
+  `.ai-lab/`
 
 ## Current Lab Roles
 
-The initial local roster lives in `agents/`.
+The initial local roster lives in `agents/`:
 
 - `lab-orchestrator`
 - `lab-worker`
@@ -79,8 +67,7 @@ The current intended command lifecycle is:
 3. `ai-lab run <plan>`
 4. human review of the generated report
 
-The exact wrapper behavior is still to be implemented, but this is the current
-shape of the interface Lab is aiming toward.
+This is the intended interface Lab is aiming toward.
 
 ## Runtime Notes
 
@@ -89,20 +76,15 @@ is not the primary Lab path.
 
 The intended Lab interface is an `ai-lab` wrapper around OpenCode.
 
-The exact wrapper behavior and server lifecycle are still to be implemented.
+## Run Records
 
-## Sprint Template
-
-Use `templates/sprint/` as the starting point for a new sprint directory.
-
-It defines only the broad file structure needed for:
-
-- design input
-- roadmap and feedback
-- artifacts
-- logs
-- reports
-- status
+Run records are created under `.ai-lab/runs/`.
 
 In real project instances, runtime state should live under deterministic
-run-id-based directories in `.ai-lab/runs/`.
+run-id-based directories in `.ai-lab/runs/`, using the form
+`YYYY-MM-DD-HH-MM_slug`.
+
+Repo-modifying runs may also use isolated execution checkouts under
+`.ai-lab/benches/`.
+
+For the detailed run contract, see `DESIGN.md`.

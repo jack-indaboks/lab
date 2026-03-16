@@ -1,5 +1,5 @@
 ---
-description: Reviews sprint outputs, runs selected checks when needed, and writes explicit validation result artifacts.
+description: Reviews run outputs, runs selected checks when needed, and writes explicit validation result artifacts.
 mode: subagent
 permission:
   bash:
