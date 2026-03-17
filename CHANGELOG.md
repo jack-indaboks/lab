@@ -34,3 +34,10 @@
 - made `DESIGN.md` fully capture the top-level `.ai-lab` contract and wrapper-created versus runtime-created run artifacts
 - added an explicit `.ai-lab` directory layout and creation-timing spec to `DESIGN.md`
 - marked `CHANGELOG.md` as append-only in `DOCS.md`
+*Commit: b597c6d cleanup*
+
+- reviewed a reference implementation and added selected ideas to the roadmap
+- defined brief invariants in `DESIGN.md` and added matching user-facing brief guidance to `README.md`
+- defined the initial brief contract in `DESIGN.md`
+- defined the initial plan contract in `DESIGN.md`
+- updated the run directory contract in `DESIGN.md` to use step-oriented execution records under `.ai-lab/runs/<run-id>/steps/`

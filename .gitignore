@@ -19,3 +19,6 @@
 
 # Ad hoc logs
 *.log
+
+# Local reference imports and private analysis notes
+/.imports/

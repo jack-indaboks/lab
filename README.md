@@ -69,6 +69,19 @@ The current intended command lifecycle is:
 
 This is the intended interface Lab is aiming toward.
 
+## Brief Guidance
+
+A brief does not need one rigid template, but it should make these things clear:
+
+- the objective
+- the scope boundaries
+- the success criteria
+- the target surface when that is not obvious from context
+- the constraints or prohibitions
+- the key inputs or source artifacts
+
+The exact headings, order, and phrasing may vary. Execution will not begin until the brief is complete and understood.
+
 ## Runtime Notes
 
 Typing `opencode` starts the TUI. That is useful for manual interaction, but it

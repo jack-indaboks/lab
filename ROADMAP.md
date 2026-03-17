@@ -12,9 +12,12 @@ current Lab scaffold and the design vision described in `DESIGN.md`.
 Goal: a fresh clone of the template can be configured, run end to end, and
 produce a usable report.
 
+- [x] Define the initial brief contract and document the required meanings.
+- [x] Define the initial plan contract and required sections.
+- [x] Define the deterministic `.ai-lab` run directory contract.
+- [ ] Define minimal validator result levels and decision policy.
+- [ ] Define the minimum final report rubric for objective, changes, validation status, evidence, unresolved questions, and next action.
 - [ ] Tighten the first-pass agent prompts so each role has explicit read/write targets and stop conditions.
-- [ ] Define the initial brief format and document the required sections.
-- [ ] Define the deterministic run-id directory contract under `.ai-lab/runs/`.
 - [ ] Implement the first `ai-lab` wrapper around OpenCode.
 - [ ] Make `ai-lab plan <brief>` generate a plan artifact from a brief.
 - [ ] Make `ai-lab run <plan>` execute an approved plan and write run artifacts.
@@ -25,10 +28,13 @@ produce a usable report.
 Goal: make the template reliable enough for repeated local use and clearer
 iteration.
 
-- [ ] Define the plan artifact format.
+- [ ] Refine the plan artifact format.
 - [ ] Define the run metadata format.
 - [ ] Define the validator result format.
 - [ ] Define the report format for human review.
+- [ ] Add a lightweight preflight registry for env requirements, protected paths, and mutation guardrails.
+- [ ] Add a structured validation registry for default result handling and recommended checks.
+- [ ] Add schemas for stable Lab registries once their shapes settle.
 - [ ] Revise orchestrator, worker, validator, and reporter prompts based on POC findings.
 
 ## Template Readiness (`0.1.0`)
@@ -39,6 +45,7 @@ try.
 - [ ] Make the template structure and instance model clear for other users.
 - [ ] Make wrapper usage understandable without private context.
 - [ ] Define the minimum setup steps for a new instance.
+- [ ] Decide which narrow operator-facing commands belong beyond `plan` and `run`.
 - [ ] Document current limitations and rough edges explicitly.
 - [ ] Verify repeatable end-to-end use outside the original development environment.
 

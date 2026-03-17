@@ -26,6 +26,9 @@ maintaining them.
 - `CHANGELOG.md` is append-only.
 - Add new entries; do not rewrite prior history except to correct clear factual
   errors.
+- Do not add changelog entries for routine roadmap checkbox changes or wording
+  cleanup unless they reflect a substantive project decision or completed body
+  of work.
 
 ## Roadmap Rules
 
