@@ -41,3 +41,18 @@
 - defined the initial brief contract in `DESIGN.md`
 - defined the initial plan contract in `DESIGN.md`
 - updated the run directory contract in `DESIGN.md` to use step-oriented execution records under `.ai-lab/runs/<run-id>/steps/`
+*Commit: cce5426 contracts*
+
+## 2026-03-17
+
+- defined validator result levels and default orchestration policy in `DESIGN.md`
+- defined the basic validation response shape in `DESIGN.md`
+- clarified the meaning of `recommended_action` for provisional validation results in `DESIGN.md`
+- defined the minimum final report rubric in `DESIGN.md` and aligned `lab-reporter.md` to it
+- added a wrapper-orchestrator-subagent boundary contract item to the POC roadmap ahead of prompt tightening and wrapper implementation
+- defined the wrapper, orchestrator, and subagent boundary contract in `DESIGN.md` and aligned `lab-orchestrator.md` to it
+- replaced the placeholder worker prompt with a scoped, artifact-aware prompt aligned to the boundary contract
+- replaced the placeholder validator prompt with an evidence-driven prompt aligned to the validation policy and boundary contract
+- renamed execution modes to `artifact` and `bench` and made planning mode set `Execution Mode` explicitly for wrapper bench provisioning
+- replaced the placeholder reporter prompt with a synthesis-focused prompt aligned to the report contract and boundary model
+- removed lab-planner.md in favor of a single orchestrator role that covers both planning and execution orchestration
