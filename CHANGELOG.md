@@ -64,3 +64,9 @@
 - updated `.gitignore` to ignore project-local `.ai-lab/` runtime state
 - refocused `README.md` into a user-facing installation and usage guide, including the project-local `.git` / `.opencode` / `.ai-lab` instance shape and current wrapper behavior
 - revised `ROADMAP.md` so wrapper implementation is marked complete, POC remains milestone-oriented, and filesystem masking moves to Local Hardening
+*Commit: 750b370 first-executable*
+
+- added explicit `glob` permission in `opencode.json` so noninteractive orchestrator runs do not auto-reject common file-discovery calls
+- updated `lab-orchestrator.md` to read the project-local `.opencode/DESIGN.md` contract directly instead of discovering `DESIGN.md` by glob
+- added guardrails in `lab-orchestrator.md` so wrapper-populated top-level run fields are not blanked during orchestration updates
+- replaced `DOCS.md` with `DEVELOPMENT.md` as the maintainer-facing canon for development workflow, projection testing workflow, and document-update discipline

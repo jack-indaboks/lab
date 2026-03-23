@@ -4,6 +4,7 @@
   "permission": {
     "*": "ask",
     "read": "allow",
+    "glob": "allow",
     "task": {
       "*": "deny",
       "lab-*": "allow"

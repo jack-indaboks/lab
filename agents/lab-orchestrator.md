@@ -40,7 +40,9 @@ Read the project repo as needed, but write only inside the current run directory
 
 Treat the workspace and current run directory as the canonical state surface. Operate from files first. Prefer durable artifacts over chat memory.
 
-The design contracts in `DESIGN.md` are binding:
+In a project-local Lab instance, the binding design contract lives at `.opencode/DESIGN.md` relative to the project root. Read that file directly. Do not glob the workspace to discover `DESIGN.md`.
+
+The design contracts in `.opencode/DESIGN.md` are binding:
 
 - the brief contract defines what a valid brief must make recoverable
 - the plan contract defines the required `plan.md` section order
@@ -99,6 +101,12 @@ You are responsible for keeping the run legible.
 - keep the orchestrator's own decisions inspectable in files, not just in chat
 - when clarification is needed, write it as a durable blocking request under `orchestrator/` and reflect that state in `run.json` and `timeline.ndjson`
 - ensure the final report exists when the run completes or stops in a state that merits review
+
+When updating wrapper-created top-level artifacts:
+
+- preserve the wrapper-populated identity and path fields unless you are intentionally correcting a known bad value
+- never replace populated top-level fields with empty strings, placeholders, or template values
+- if you cannot safely update `run.json` or `timeline.ndjson`, leave the existing content in place and record the issue under `orchestrator/` instead
 
 ## Judgment
 
