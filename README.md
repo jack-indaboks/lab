@@ -2,68 +2,59 @@
 
 Lab is a file-native agent execution framework built around explicit briefs, plans, runs, logs, validation, and reports.
 
-This repository is the canonical source for the Lab configuration, prompts, and project documentation.
+This repository is the canonical source for Lab prompts, wrapper code, and project documentation.
 
-## Draft Status
+Use this README for installation and current usage.
+Use `DESIGN.md` for the intended end state.
+Use `ROADMAP.md` for implementation status.
 
-Lab is still in early implementation.
+## What Lab Looks Like In Use
 
-The current agent files are placeholder operational drafts, not finalized canon.
+The intended project-local shape is:
 
-## Instance Model
+```text
+myRepo/
+  .git/
+  .opencode/    # active Lab/OpenCode projection
+  .ai-lab/      # generated Lab runtime state
+```
 
-OpenCode consumes an active Lab instance through an OpenCode-facing binding.
+## Prerequisites
 
-That binding may take different forms:
+Current POC usage assumes:
 
-- `myProject/.opencode/`
-- `~/.config/opencode/`
-- a symlink to a canonical Lab repo
-- a direct clone of a Lab repo used in place
+- `git` is installed
+- `opencode` is installed and working
+- the project already has a `.git/` entry at its root
+- the active `.opencode/` projection exposes the Lab agent roster, including `lab-orchestrator`
 
-The binding location is flexible.
+## Installation
 
-The current model is:
+The current wrapper source lives in `bin/ai-lab` in this repo.
 
-- `lab/` repo: canonical source
-- active OpenCode binding: one current OpenCode-facing projection of Lab
-- `myProject/.ai-lab/`: generated Lab runtime state for the project being worked on
+For a project-local OpenCode instance, the expected shape is that this repo is instantiated into the project's `.opencode/` directory structure.
 
-Lab canon and generated runtime state are intentionally separate.
+At minimum:
 
-`.ai-lab` belongs in the project directory, regardless of where the active OpenCode binding lives.
+1. Make sure your target project has a root directory with `.git/`.
+2. Make sure that project has an active `.opencode/` projection containing the Lab agents and wrapper.
+3. Make the wrapper available as `.opencode/bin/ai-lab`.
+4. Run `ai-lab` from the project root or from the project's `.opencode/` directory.
 
-## Secrets And Runtime Data
+The wrapper resolves `.ai-lab/` at the project root and creates it if missing.
 
-Keep secrets and runtime data out of the repo.
+## Usage
 
-- keep API credentials in environment variables or separate local files
-- let OpenCode auth/session data stay in its normal machine-local locations
-- keep generated run outputs in ignored project-local runtime state such as `.ai-lab/`
-
-## Current Lab Roles
-
-The initial local roster lives in `agents/`:
-
-- `lab-orchestrator`
-- `lab-worker`
-- `lab-validator`
-- `lab-reporter`
-
-These are intentionally broad first-pass definitions.
-
-## Current Command Lifecycle
-
-The current intended command lifecycle is:
+The current operator flow is:
 
 1. `ai-lab plan <brief>`
-2. human review of the generated plan
-3. `ai-lab run <plan>`
-4. human review of the generated report
+2. review the generated `plan.md`
+3. `ai-lab run <slug>`
+4. review the generated `report.md`
 
-This is the intended interface Lab is aiming toward.
+### `ai-lab plan <brief>`
 
-## Brief Guidance
+Creates a new run under `.ai-lab/runs/<run-id>/`, copies the brief into that run as `brief.md`, initializes top-level run artifacts, and invokes the orchestrator in planning mode.
 
 A brief does not need one rigid template, but it should make these things clear:
 
@@ -74,20 +65,40 @@ A brief does not need one rigid template, but it should make these things clear:
 - the constraints or prohibitions
 - the key inputs or source artifacts
 
-The exact headings, order, and phrasing may vary. Execution will not begin until the brief is complete and understood.
+The exact headings, order, and phrasing may vary. Execution will not begin until the brief is complete enough to support planning.
 
-## Runtime Notes
+### `ai-lab run <slug>`
 
-Typing `opencode` starts the TUI. That is useful for manual interaction, but it is not the primary Lab path.
+Resolves the requested slug to a run under `.ai-lab/runs/`, reads `plan.md`, and invokes the orchestrator in run mode. If more than one run matches the slug, use the full run id instead. If `Execution Mode` is `bench`, the wrapper provisions `.ai-lab/benches/<run-id>/` with `git worktree` before execution continues.
 
-The intended Lab interface is an `ai-lab` wrapper around OpenCode.
+## Current Runtime Notes
 
-## Run Records
+- Typing `opencode` starts the TUI. That can be useful for manual interaction, but it is not the primary Lab path.
+- Run the wrapper from the project root or from the sibling `.opencode/` directory.
+- `.ai-lab/` always lives at the project root.
+- `bench` runs currently depend on `git worktree`.
+- The wrapper fails fast when required structure or required git operations are missing.
 
-Run records are created under `.ai-lab/runs/`.
+## Current Limitations
 
-In real project instances, runtime state should live under deterministic run-id-based directories in `.ai-lab/runs/`, using the form `YYYY-MM-DD-HH-MM_slug`.
+Lab is still in early implementation.
 
-Bench runs may also use isolated execution checkouts under `.ai-lab/benches/`.
+Current limitations include:
 
-For the detailed run contract, see `DESIGN.md`.
+- the wrapper is drafted but not yet proven through a full end-to-end project run
+- hardening work such as stronger confinement, schemas, and registries is still ahead
+- the prompts are first-pass POC prompts and will likely change after runtime testing
+- template-readiness and downstream portability work have not happened yet
+
+For the detailed design vision, read `DESIGN.md`.
+For the implementation backlog and status, read `ROADMAP.md`.
+
+## Secrets And Runtime Data
+
+Keep secrets and generated runtime data out of the canonical repo.
+
+- keep credentials in environment variables or separate local files
+- keep generated run outputs in project-local `.ai-lab/`
+- let OpenCode auth and session data stay in their normal local locations
+
+For the detailed runtime contract, see `DESIGN.md`.

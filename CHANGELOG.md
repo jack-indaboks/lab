@@ -56,3 +56,11 @@
 - renamed execution modes to `artifact` and `bench` and made planning mode set `Execution Mode` explicitly for wrapper bench provisioning
 - replaced the placeholder reporter prompt with a synthesis-focused prompt aligned to the report contract and boundary model
 - removed lab-planner.md in favor of a single orchestrator role that covers both planning and execution orchestration
+*Commit: 769a6db prompts*
+
+## 2026-03-23
+
+- added the first shell-based `ai-lab` wrapper in `bin/ai-lab` with project-root resolution, `.ai-lab` run initialization, slug-based `run` lookup, and `git worktree` bench setup
+- updated `.gitignore` to ignore project-local `.ai-lab/` runtime state
+- refocused `README.md` into a user-facing installation and usage guide, including the project-local `.git` / `.opencode` / `.ai-lab` instance shape and current wrapper behavior
+- revised `ROADMAP.md` so wrapper implementation is marked complete, POC remains milestone-oriented, and filesystem masking moves to Local Hardening

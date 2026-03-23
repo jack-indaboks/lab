@@ -1,0 +1,391 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+PROGRAM_NAME="ai-lab"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ai-lab plan <brief>
+  ai-lab run <slug>
+
+POC behavior:
+  - operates on a project instance with .git, .opencode, and .ai-lab under the project root
+  - when invoked from the project root, uses ./.ai-lab/
+  - when invoked from ./.opencode/, still uses the sibling ./.ai-lab/ under the project root
+  - uses git worktree for bench-mode runs
+EOF
+}
+
+fail() {
+  printf '%s: %s\n' "$PROGRAM_NAME" "$*" >&2
+  exit 1
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || fail "required command not found: $1"
+}
+
+resolve_project_dir() {
+  local cwd_name cwd_path parent_path
+
+  cwd_path=$(pwd -P)
+  cwd_name=$(basename "$cwd_path")
+
+  if [ -e "$cwd_path/.git" ]; then
+    PROJECT_DIR="$cwd_path"
+  elif [ "$cwd_name" = ".opencode" ]; then
+    parent_path=$(cd "$cwd_path/.." && pwd -P)
+    [ -e "$parent_path/.git" ] || fail "expected a .git entry beside .opencode"
+    PROJECT_DIR="$parent_path"
+  else
+    fail "run ai-lab from the project root or its .opencode directory"
+  fi
+
+  git -C "$PROJECT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || fail "resolved project directory is not a valid git work tree"
+  [ -d "$PROJECT_DIR/.opencode" ] || fail "project root is missing .opencode"
+}
+
+json_escape() {
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/\\n/g'
+}
+
+iso_timestamp() {
+  date '+%Y-%m-%dT%H:%M:%S'
+}
+
+run_id_timestamp() {
+  date '+%Y-%m-%d-%H-%M'
+}
+
+slugify() {
+  local value
+  value=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  value=$(printf '%s' "$value" | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g')
+  if [ -z "$value" ]; then
+    value="run"
+  fi
+  printf '%s' "$value"
+}
+
+abspath_file() {
+  local input_path dir_path base_name
+
+  input_path="$1"
+  [ -f "$input_path" ] || fail "file not found: $input_path"
+
+  dir_path=$(cd "$(dirname "$input_path")" && pwd -P)
+  base_name=$(basename "$input_path")
+  printf '%s/%s' "$dir_path" "$base_name"
+}
+
+append_timeline() {
+  local event_type message now
+
+  event_type="$1"
+  message="$2"
+  now=$(iso_timestamp)
+
+  printf '{"timestamp":"%s","event":"%s","message":"%s"}\n' \
+    "$(json_escape "$now")" \
+    "$(json_escape "$event_type")" \
+    "$(json_escape "$message")" >> "$TIMELINE_PATH"
+}
+
+read_created_at() {
+  if [ ! -f "$RUN_JSON_PATH" ]; then
+    printf '%s' "$(iso_timestamp)"
+    return
+  fi
+
+  sed -n 's/.*"created_at":"\([^"]*\)".*/\1/p' "$RUN_JSON_PATH" | head -n 1
+}
+
+write_run_json() {
+  local phase status execution_mode bench_path created_at now
+
+  phase="$1"
+  status="$2"
+  execution_mode="$3"
+  bench_path="$4"
+  created_at=$(read_created_at)
+  now=$(iso_timestamp)
+
+  cat > "$RUN_JSON_PATH" <<EOF
+{
+  "run_id": "$(json_escape "$RUN_ID")",
+  "project_dir": "$(json_escape "$PROJECT_DIR")",
+  "run_dir": "$(json_escape "$RUN_DIR")",
+  "brief_path": "$(json_escape "$BRIEF_PATH")",
+  "plan_path": "$(json_escape "$PLAN_PATH")",
+  "report_path": "$(json_escape "$REPORT_PATH")",
+  "bench_path": "$(json_escape "$bench_path")",
+  "phase": "$(json_escape "$phase")",
+  "status": "$(json_escape "$status")",
+  "execution_mode": "$(json_escape "$execution_mode")",
+  "created_at": "$(json_escape "$created_at")",
+  "updated_at": "$(json_escape "$now")"
+}
+EOF
+}
+
+ensure_ai_lab_root() {
+  mkdir -p "$PROJECT_DIR/.ai-lab/runs" "$PROJECT_DIR/.ai-lab/benches"
+}
+
+next_run_id() {
+  local base candidate counter
+
+  base="$1"
+  candidate="$base"
+  counter=1
+
+  while [ -e "$PROJECT_DIR/.ai-lab/runs/$candidate" ]; do
+    candidate=$(printf '%s-%02d' "$base" "$counter")
+    counter=$((counter + 1))
+  done
+
+  printf '%s' "$candidate"
+}
+
+resolve_run_id() {
+  local input_name normalized_slug
+  local -a matches
+
+  input_name="$1"
+
+  if [ -d "$PROJECT_DIR/.ai-lab/runs/$input_name" ]; then
+    printf '%s' "$input_name"
+    return
+  fi
+
+  normalized_slug=$(slugify "$input_name")
+  mapfile -t matches < <(
+    find "$PROJECT_DIR/.ai-lab/runs" -mindepth 1 -maxdepth 1 -type d \( \
+      -name "*_${normalized_slug}" -o \
+      -name "*_${normalized_slug}-[0-9][0-9]" \
+    \) -print | sort -r
+  )
+
+  case "${#matches[@]}" in
+    0)
+      fail "no run found for slug: $input_name"
+      ;;
+    1)
+      printf '%s' "${matches[0]##*/}"
+      ;;
+    *)
+      fail "multiple runs matched slug '$input_name'; use the full run id"
+      ;;
+  esac
+}
+
+require_agent() {
+  local agent_name
+
+  agent_name="$1"
+  (
+    cd "$PROJECT_DIR"
+    opencode agent list
+  ) | grep -Eq "^${agent_name}( |$)" || fail "required OpenCode agent is not available in the current .opencode projection: $agent_name"
+}
+
+extract_execution_mode() {
+  awk '
+    BEGIN { in_section = 0 }
+    {
+      line = $0
+      sub(/\r$/, "", line)
+
+      if (line ~ /^#{1,6}[[:space:]]*Execution Mode[[:space:]]*$/) {
+        in_section = 1
+        next
+      }
+
+      if (in_section == 1 && line ~ /^#{1,6}[[:space:]]+/) {
+        exit
+      }
+
+      if (in_section == 1) {
+        gsub(/^[[:space:]-]+/, "", line)
+        gsub(/[[:space:]]+$/, "", line)
+        if (line != "") {
+          print tolower(line)
+          exit
+        }
+      }
+    }
+  ' "$PLAN_PATH"
+}
+
+ensure_bench_worktree() {
+  if [ -d "$BENCH_DIR" ]; then
+    git -C "$BENCH_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 || fail "existing bench directory is not a valid git worktree: $BENCH_DIR"
+    return
+  fi
+
+  git worktree add "$BENCH_DIR" HEAD >/dev/null || fail "git worktree add failed for $BENCH_DIR"
+}
+
+invoke_opencode() {
+  local message attached_file
+
+  message="$1"
+  attached_file="$2"
+
+  export AI_LAB_MODE="$COMMAND"
+  export AI_LAB_RUN_ID="$RUN_ID"
+  export AI_LAB_PROJECT_DIR="$PROJECT_DIR"
+  export AI_LAB_RUN_DIR="$RUN_DIR"
+  export AI_LAB_BRIEF_PATH="$BRIEF_PATH"
+  export AI_LAB_PLAN_PATH="$PLAN_PATH"
+  export AI_LAB_REPORT_PATH="$REPORT_PATH"
+  export AI_LAB_BENCH_DIR="$BENCH_DIR"
+
+  opencode run \
+    --dir "$PROJECT_DIR" \
+    --agent lab-orchestrator \
+    --file "$attached_file" \
+    --title "$RUN_ID" \
+    "$message"
+}
+
+start_plan() {
+  local brief_source brief_name brief_slug base_run_id
+
+  brief_source=$(abspath_file "$1")
+  brief_name=$(basename "$brief_source")
+  brief_name=${brief_name%.*}
+  brief_slug=$(slugify "$brief_name")
+  base_run_id="$(run_id_timestamp)_${brief_slug}"
+  RUN_ID=$(next_run_id "$base_run_id")
+  RUN_DIR="$PROJECT_DIR/.ai-lab/runs/$RUN_ID"
+  BENCH_DIR="$PROJECT_DIR/.ai-lab/benches/$RUN_ID"
+  RUN_JSON_PATH="$RUN_DIR/run.json"
+  TIMELINE_PATH="$RUN_DIR/timeline.ndjson"
+  BRIEF_PATH="$RUN_DIR/brief.md"
+  PLAN_PATH="$RUN_DIR/plan.md"
+  REPORT_PATH="$RUN_DIR/report.md"
+
+  mkdir -p "$RUN_DIR"
+  cp "$brief_source" "$BRIEF_PATH"
+  : > "$TIMELINE_PATH"
+
+  write_run_json "planning" "initializing" "" ""
+  append_timeline "run_initialized" "created planning run directory"
+  append_timeline "brief_copied" "copied brief into run record"
+
+  write_run_json "planning" "running" "" ""
+  append_timeline "planning_started" "invoking lab-orchestrator in planning mode"
+
+  if ! invoke_opencode "Planning mode for the current Lab run. Read brief.md from the run directory, produce or revise plan.md there, validate the plan before stopping, and do not begin execution." "$BRIEF_PATH"; then
+    write_run_json "planning" "failed" "" ""
+    append_timeline "planning_failed" "opencode planning invocation exited non-zero"
+    fail "planning failed for run $RUN_ID"
+  fi
+
+  [ -f "$PLAN_PATH" ] || {
+    write_run_json "planning" "failed" "" ""
+    append_timeline "planning_failed" "planning exited without producing plan.md"
+    fail "planning did not produce plan.md for run $RUN_ID"
+  }
+
+  write_run_json "planning" "ready_for_review" "" ""
+  append_timeline "planning_completed" "plan.md is ready for review"
+  printf '%s\n' "$RUN_ID"
+}
+
+start_run() {
+  local execution_mode
+
+  RUN_ID=$(resolve_run_id "$1")
+  RUN_DIR="$PROJECT_DIR/.ai-lab/runs/$RUN_ID"
+  BENCH_DIR="$PROJECT_DIR/.ai-lab/benches/$RUN_ID"
+  RUN_JSON_PATH="$RUN_DIR/run.json"
+  TIMELINE_PATH="$RUN_DIR/timeline.ndjson"
+  BRIEF_PATH="$RUN_DIR/brief.md"
+  PLAN_PATH="$RUN_DIR/plan.md"
+  REPORT_PATH="$RUN_DIR/report.md"
+
+  [ -d "$RUN_DIR" ] || fail "run not found under current working directory: $RUN_ID"
+  [ -f "$PLAN_PATH" ] || fail "run is missing plan.md: $RUN_ID"
+  [ -f "$RUN_JSON_PATH" ] || fail "run is missing run.json: $RUN_ID"
+  [ -f "$TIMELINE_PATH" ] || fail "run is missing timeline.ndjson: $RUN_ID"
+
+  execution_mode=$(extract_execution_mode)
+  case "$execution_mode" in
+    artifact)
+      BENCH_DIR=""
+      ;;
+    bench)
+      BENCH_DIR="$PROJECT_DIR/.ai-lab/benches/$RUN_ID"
+      ensure_bench_worktree
+      append_timeline "bench_ready" "bench worktree is ready for run execution"
+      ;;
+    *)
+      fail "plan.md must declare Execution Mode as artifact or bench"
+      ;;
+  esac
+
+  write_run_json "execution" "running" "$execution_mode" "$BENCH_DIR"
+  append_timeline "run_started" "invoking lab-orchestrator in run mode"
+
+  if ! invoke_opencode "Run mode for the current Lab run. Treat plan.md as the execution contract, execute the approved plan step by step, maintain run artifacts, and stop only when the run has reached a reviewable end state." "$PLAN_PATH"; then
+    write_run_json "execution" "failed" "$execution_mode" "$BENCH_DIR"
+    append_timeline "run_failed" "opencode execution invocation exited non-zero"
+    fail "run failed for $RUN_ID"
+  fi
+
+  write_run_json "execution" "stopped_for_review" "$execution_mode" "$BENCH_DIR"
+  append_timeline "run_completed" "execution invocation completed"
+  printf '%s\n' "$RUN_ID"
+}
+
+main() {
+  local subcommand
+
+  [ "$#" -gt 0 ] || {
+    usage
+    exit 1
+  }
+
+  subcommand="$1"
+  shift
+
+  case "$subcommand" in
+    -h|--help|help)
+      usage
+      exit 0
+      ;;
+    plan)
+      [ "$#" -eq 1 ] || fail "plan requires exactly one brief path"
+      COMMAND="plan"
+      ;;
+    run)
+      [ "$#" -eq 1 ] || fail "run requires exactly one slug"
+      COMMAND="run"
+      ;;
+    *)
+      usage
+      fail "unknown command: $subcommand"
+      ;;
+  esac
+
+  require_command git
+  require_command opencode
+  resolve_project_dir
+  ensure_ai_lab_root
+  require_agent lab-orchestrator
+
+  case "$COMMAND" in
+    plan)
+      start_plan "$1"
+      ;;
+    run)
+      start_run "$1"
+      ;;
+  esac
+}
+
+main "$@"

@@ -17,16 +17,17 @@ Goal: a fresh clone of the template can be configured, run end to end, and produ
 - [x] Define the minimum final report rubric for objective, changes, validation status, evidence, unresolved questions, and next action.
 - [x] Define the wrapper, orchestrator, and subagent boundary contract for run setup, state updates, delegation, and stopping behavior.
 - [x] Tighten the first-pass agent prompts so each role has explicit read/write targets and stop conditions.
-- [ ] Implement the first `ai-lab` wrapper around OpenCode.
-  - [ ] Mask the OpenCode process filesystem so the repo is readable but writes are limited to the current run directory and bench when applicable.
-- [ ] Make `ai-lab plan <brief>` generate a plan artifact from a brief.
-- [ ] Make `ai-lab run <plan>` execute an approved plan and write run artifacts.
+- [x] Implement the first `ai-lab` wrapper around OpenCode.
 - [ ] Produce a usable end-to-end run report from a fresh-clone template run.
+  - [ ] Validate the wrapper in a project-local `.opencode` instance.
+  - [ ] `ai-lab plan <brief>` generates a usable plan artifact from a brief.
+  - [ ] `ai-lab run <slug>` executes an approved plan and writes run artifacts.
 
 ## Local Hardening
 
 Goal: make the template reliable enough for repeated local use and clearer iteration.
 
+- [ ] Mask the OpenCode process filesystem so the repo is readable but writes are limited to the current run directory and bench when applicable.
 - [ ] Refine the plan artifact format.
 - [ ] Define the run metadata format.
 - [ ] Define the validator result format.
