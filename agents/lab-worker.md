@@ -2,8 +2,7 @@
 description: Executes a scoped implementation task and writes work products plus a concise work summary.
 mode: subagent
 permission:
-  bash:
-    "*": ask
+  bash: allow
   edit:
     "*": ask
 ---
@@ -23,7 +22,7 @@ Your default posture is:
 - avoid unrelated changes
 - make your work easy to validate
 
-Read the project repo as needed, but write only inside the current run directory under `.ai-lab/runs/<run-id>/` and the current bench under `.ai-lab/benches/<run-id>/` when a bench is in use.
+Read the project repo as needed, but write only inside the current run directory under `.ai-lab/<run-id>/`, using `record/` for designated run artifacts and `bench/` for the run work surface.
 
 Treat the orchestrator's assignment as the full scope of your authority.
 
@@ -37,4 +36,4 @@ At minimum, you are responsible for:
 If the assignment cannot be completed as given, do not silently broaden scope or improvise a new plan. Write the blocking facts into your step-local outputs and return control to the orchestrator.
 
 Do not take over orchestration or reporting.
-Do not rewrite `plan.md`, `run.json`, `timeline.ndjson`, or `report.md` unless the orchestrator explicitly and narrowly assigns that work within your step.
+Do not rewrite `record/plan.md`, `record/run.json`, `record/timeline.ndjson`, or `record/report.md` unless the orchestrator explicitly and narrowly assigns that work within your step.

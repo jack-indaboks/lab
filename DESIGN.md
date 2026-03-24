@@ -6,13 +6,14 @@ This document describes the intended final design of the Lab system.
 
 ## Goal
 
-Provide a file-native agent execution environment where:
+Provide a file-native agent laboratory where:
 
 - input begins with a brief
 - Lab generates an executable plan from that brief
-- execution happens through a runtime binding
+- execution happens through a runtime binding rooted in a prepared bench
 - the workspace remains the canonical home for run state, logs, artifacts, and reports
 - an orchestrator agent provisions specialized subagents as needed
+- agents operate inside a controlled developer work surface rather than directly against the live project root
 - most agents work only with files, while a smaller set may use tools or sandboxed execution
 - output ends with a run report backed by preserved logs
 
@@ -22,7 +23,7 @@ The system has four major parts:
 
 1. VS Code workspace
 2. runtime binding
-3. Optional execution environments for selected agents
+3. Run-scoped execution environments for selected agents
 4. Tool access through shell, MCP, and OpenAPI-compatible services where needed
 
 ## Workspace Role
@@ -47,14 +48,15 @@ In project instances, this design assumes a three-part split:
 - runtime-specific binding
 - generated project-local Lab runtime state
 
-For bench runs, project-local isolated execution checkouts should live under `.ai-lab/benches/`.
+Every run gets a run-rooted workspace. Each run directory contains both the durable run record and the bench work surface.
 
 The naming model is:
 
 - `lab`: canonical repo
 - active runtime binding: one current Lab projection for a supported runtime, which may live in a project, in home config, as a symlink, or as a direct clone
 - `.ai-lab`: generated run state inside the project being worked on
-- `.ai-lab/benches/<run-id>/`: isolated execution checkout for a run that modifies project files
+- `.ai-lab/<run-id>/record/`: durable run record for a run
+- `.ai-lab/<run-id>/bench/`: isolated execution checkout and agent workspace for a run
 
 Runtime state should use deterministic run-id-based subdirectories in the form `YYYY-MM-DD-HH-MM_slug`, using a local timestamp without a timezone suffix.
 
@@ -67,12 +69,18 @@ The runtime binding is responsible for:
 - allowing the orchestrator agent to invoke specialized subagents
 - enforcing per-agent permissions and tool access
 - carrying out unattended execution once a plan is approved for run
+- exposing a predictable tool contract inside the run workspace so unattended agents do not discover capabilities by crashing into denied tools
+
+For execution-capable Lab agents, standard workspace shell access may be available for routine file discovery, metadata inspection, and deterministic checks, but only inside an explicit containment boundary. Lab should not rely on one-off permission approvals as its primary safety model, and it should not treat unsandboxed broad shell access as acceptable for end-to-end testing.
 
 The runtime binding is an instance projection, not the canonical source of Lab behavior.
 
 The location of that projection is flexible.
 
 The location of `.ai-lab` is not: it belongs in the project being operated on.
+
+The bench is not optional convenience scaffolding. It is the laboratory work surface.
+Lab should not treat direct execution against the live project root as the normal operating model.
 
 ## .ai-lab Contract
 
@@ -82,8 +90,8 @@ Expected structure:
 
 ```text
 .ai-lab/
-   runs/                          # canonical run records
-      <run-id>/
+   <run-id>/
+      record/                     # durable run record
          run.json                   # top-level run metadata and mode
          timeline.ndjson            # ordered audit events
          brief.md                   # run input
@@ -97,48 +105,47 @@ Expected structure:
             step-002/
                worker-001/
                validator-001/
-   benches/                       # isolated execution checkouts for bench runs
-      <run-id>/
+      bench/                      # mandatory isolated execution checkout and agent workspace
 ```
 
 Creation rules:
 
-- the wrapper creates `.ai-lab/`, `.ai-lab/runs/`, `.ai-lab/runs/<run-id>/`, `run.json`, and `timeline.ndjson`
-- the wrapper creates `.ai-lab/benches/<run-id>/` only when a run needs an isolated bench checkout
+- the wrapper creates `.ai-lab/`, `.ai-lab/<run-id>/`, `.ai-lab/<run-id>/record/`, `.ai-lab/<run-id>/bench/`, `record/run.json`, and `record/timeline.ndjson`
 - the brief and plan must exist before execution begins
-- the orchestrator creates `orchestrator/`, `steps/`, step directories, and per-invocation directories as execution proceeds
-- the reporter creates `report.md`
+- the orchestrator creates `record/orchestrator/`, `record/steps/`, step directories, and per-invocation directories as execution proceeds
+- the reporter creates `record/report.md`
 
 ## Run Contract
 
-Each Lab run should create a deterministic run directory under `.ai-lab/runs/<run-id>/`.
+Each Lab run should create a deterministic run directory under `.ai-lab/<run-id>/`.
 
 The run directory is the canonical record of that run.
 
 The minimum run contract is:
 
-- `brief.md`: the brief given to Lab
-- `plan.md`: the executable plan generated from the brief
-- `run.json`: run metadata and top-level status
-- `timeline.ndjson`: ordered run events for auditability
-- `report.md`: final human review report
-- `orchestrator/`: orchestrator logs and status
-- `steps/`: execution steps and their worker and validator attempts
+- `record/brief.md`: the brief given to Lab
+- `record/plan.md`: the executable plan generated from the brief
+- `record/run.json`: run metadata and top-level status
+- `record/timeline.ndjson`: ordered run events for auditability
+- `record/report.md`: final human review report
+- `record/orchestrator/`: orchestrator logs and status
+- `record/steps/`: execution steps and their worker and validator attempts
+- `bench/`: the run bench and agent work surface
 
 The wrapper should create the run directory itself and initialize the top-level artifacts that exist before planning or execution begins.
 
 At minimum, wrapper-created run artifacts are:
 
-- `run.json`
-- `timeline.ndjson`
+- `record/run.json`
+- `record/timeline.ndjson`
 
 Other top-level artifacts are created during the run lifecycle:
 
-- `brief.md`: created or copied in when a brief is provided
-- `plan.md`: created during planning
-- `report.md`: created during reporting
+- `record/brief.md`: created or copied in when a brief is provided
+- `record/plan.md`: created during planning
+- `record/report.md`: created during reporting
 
-Role-specific directories such as `orchestrator/` and `steps/` should be created dynamically according to the directory layout and creation timing rules above.
+Role-specific directories such as `record/orchestrator/` and `record/steps/` should be created dynamically according to the directory layout and creation timing rules above.
 
 The run contract should preserve enough information to answer at least these questions after the fact:
 
@@ -148,9 +155,9 @@ The run contract should preserve enough information to answer at least these que
 - which validation result corresponded to which worker attempt
 - why a step was retried, blocked, or completed
 
-For runs that modify project files, the run record should also identify the corresponding bench and whether the run operated in `artifact` or `bench` mode.
+For runs that modify project files, the run record should identify the corresponding run bench and whether the run operated in any narrower execution sub-mode defined by the plan.
 
-For `artifact` runs, no bench is required.
+The bench is required even when the run is primarily file-native.
 
 ## Invocation Contract
 
@@ -201,10 +208,12 @@ The wrapper owns run setup and invocation framing.
 At minimum, the wrapper is responsible for:
 
 - determining whether the invocation is in planning mode or run mode
-- creating `.ai-lab/`, `.ai-lab/runs/`, and `.ai-lab/runs/<run-id>/`
-- initializing `run.json` and `timeline.ndjson`
+- creating `.ai-lab/` and `.ai-lab/<run-id>/`
+- creating `.ai-lab/<run-id>/record/` and `.ai-lab/<run-id>/bench/`
+- initializing `record/run.json` and `record/timeline.ndjson`
 - ensuring the orchestrator is launched with an unambiguous current run context
-- creating a bench only when the run requires an isolated bench working area
+- ensuring the runtime binding is rooted in the run directory so both `record/` and `bench/` are inside the workspace boundary
+- failing closed when the projected Lab binding has drifted from the expected headless capability profile
 
 The wrapper should not perform orchestration logic, interpret validation results, or silently rewrite run artifacts that belong to the orchestrator.
 
@@ -214,14 +223,14 @@ The orchestrator owns run-level interpretation, delegation, and continuity once 
 
 At minimum, the orchestrator is responsible for:
 
-- interpreting `brief.md` in planning mode
-- producing or revising `plan.md`
-- updating `run.json` and `timeline.ndjson` as the run progresses
-- creating and managing `orchestrator/` and `steps/`
+- interpreting `record/brief.md` in planning mode
+- producing or revising `record/plan.md`
+- updating `record/run.json` and `record/timeline.ndjson` as the run progresses
+- creating and managing `record/orchestrator/` and `record/steps/`
 - deciding which specialized agent to invoke for each planned step
 - translating validator outcomes into control-flow decisions
 - recording durable clarification requests and blocked states
-- ensuring `report.md` exists when the run completes or stops in a review-worthy state
+- ensuring `record/report.md` exists when the run completes or stops in a review-worthy state
 
 The orchestrator should not assume that subagents will maintain top-level run state on its behalf.
 
@@ -255,11 +264,13 @@ The system assumes three broad capability tiers:
 1. Artifact agents
    - read and write files only
 2. Limited-execution agents
-   - mostly file-based, with access to selected tools or commands
+   - mostly file-based, with an explicit declared toolbox inside the run-scoped workspace
 3. Full-execution agents
    - can use a dedicated execution environment when required
 
-Sandboxed execution is optional and role-dependent, not universal.
+For local POC and downstream testing, containment is mandatory for execution-capable roles. Broad tool access is acceptable only inside a masked filesystem boundary that restricts writes to the current run directory and its `bench/` work surface, with any broader access treated as an explicit exception.
+
+For unattended runs, permission prompts are not a viable capability model. Lab should provide a declared tool contract for the run-scoped workspace and should fail before launch when the projected binding does not match that contract.
 
 ## Reusable Agent Definitions
 
@@ -316,7 +327,7 @@ At minimum, a valid `plan.md` should include these sections in this order:
 
 Each section must be explicit enough for human review and resumable execution.
 
-`Execution Mode` should be stated explicitly as either `artifact` or `bench`. That choice is part of the execution contract and should be specific enough for the wrapper to determine whether bench provisioning is required at run time.
+`Execution Mode` should be stated explicitly. In the current design, execution is bench-first and the bench is mandatory for every run. If the plan distinguishes sub-modes later, that distinction must not weaken the requirement that the agent operates inside the run bench.
 
 `Execution Sequence` should describe the run as an ordered series of orchestrator-dispatched execution units rather than as generic prose steps.
 
@@ -417,7 +428,7 @@ Parallel agents should not share the same writable execution environment.
 
 Where agents need real execution capability, each parallel execution unit should have its own isolated working area and should write logs and artifacts only to its designated output locations.
 
-For `bench` runs, the preferred isolated working area is a run-specific bench under `.ai-lab/benches/<run-id>/`.
+For each run, the preferred isolated working area is the run-specific `bench/` directory under `.ai-lab/<run-id>/bench/`.
 
 ## Review Flow
 

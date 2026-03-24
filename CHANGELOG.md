@@ -70,3 +70,11 @@
 - updated `lab-orchestrator.md` to read the project-local `.opencode/DESIGN.md` contract directly instead of discovering `DESIGN.md` by glob
 - added guardrails in `lab-orchestrator.md` so wrapper-populated top-level run fields are not blanked during orchestration updates
 - replaced `DOCS.md` with `DEVELOPMENT.md` as the maintainer-facing canon for development workflow, projection testing workflow, and document-update discipline
+- changed the local permission baseline so execution-capable Lab agents get standard workspace shell access by default instead of one-off `bash` approvals
+- aligned `DESIGN.md`, `DEVELOPMENT.md`, `lab-orchestrator.md`, `lab-worker.md`, and `lab-validator.md` to that standard-tool execution model
+- moved filesystem containment back into the POC gate and paused end-to-end testing until execution-capable roles run inside a masked filesystem boundary or equivalent sandbox
+- revised `DESIGN.md`, `DEVELOPMENT.md`, and `ROADMAP.md` so containment, not prompt gating, is the primary safety boundary for early testing
+- revised the canon to make Lab explicitly bench-first: every run gets a bench, the bench is the intended laboratory work surface, and direct live-project execution is no longer treated as the normal model
+- added POC work items for bench-rooted OpenCode sessions, declared headless tool contracts, removal of `ask`-based capability discovery, and projection-drift checks
+- revised the `.ai-lab` layout to make each run self-contained under `.ai-lab/<run-id>/` with sibling `record/` and `bench/` subdirectories, and updated the runtime model so OpenCode sessions are rooted at the run directory
+- aligned the README, design responsibilities, roadmap state, and agent prompts to the run-rooted `record/` plus `bench/` model so the canon now matches the pivot point cleanly

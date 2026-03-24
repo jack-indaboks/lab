@@ -10,11 +10,7 @@
       "lab-*": "allow"
     },
     "bash": {
-      "*": "ask",
-      "git status*": "allow",
-      "git diff*": "allow",
-      "grep *": "allow",
-      "rg *": "allow"
+      "*": "allow"
     },
     "edit": {
       "*": "ask"

@@ -45,8 +45,12 @@ Rules:
 ## Testing And Debugging Workflow
 
 - prefer realistic project-local testing over abstract prompt review once a behavior reaches runtime questions
+- do not resume end-to-end testing until execution-capable roles are contained by filesystem masking or an equivalent sandbox boundary
+- do not treat the live project root as the normal agent workspace; the run directory is the intended laboratory surface for every run, with `record/` and `bench/` serving different roles inside it
 - when a failure is ambiguous, isolate the smallest failing step before widening the fix
 - treat permission failures, missing artifacts, and state-corruption issues as first-class bugs rather than operator noise
+- for execution-capable Lab agents, broad standard-tool access is acceptable only inside containment; outside containment, testing stops rather than normalizing broader host access
+- for unattended runs, `ask` is not an acceptable capability model; use declared allow/deny profiles and projection-drift checks instead
 - preserve auditability: debugging should make the system easier to inspect, not more magical
 - after confirming a fix in a projection, re-test from a refreshed projection sourced from canon
 
