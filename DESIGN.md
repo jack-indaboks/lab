@@ -24,7 +24,7 @@ The system has four major parts:
 1. VS Code workspace
 2. runtime binding
 3. Run-scoped execution environments for selected agents
-4. Tool access through shell, MCP, and OpenAPI-compatible services where needed
+4. A curated developer toolbox assembled from runtime built-ins and ecosystem extensions where needed
 
 ## Workspace Role
 
@@ -71,7 +71,11 @@ The runtime binding is responsible for:
 - carrying out unattended execution once a plan is approved for run
 - exposing a predictable tool contract inside the run workspace so unattended agents do not discover capabilities by crashing into denied tools
 
-For execution-capable Lab agents, standard workspace shell access may be available for routine file discovery, metadata inspection, and deterministic checks, but only inside an explicit containment boundary. Lab should not rely on one-off permission approvals as its primary safety model, and it should not treat unsandboxed broad shell access as acceptable for end-to-end testing.
+The product requirement is a known developer toolbox inside the run workspace, not arbitrary host shell execution. Lab should prefer a curated mix of runtime built-ins, plugins, MCP servers, commands, skills, and other ecosystem-provided capabilities before treating shell access as part of the answer.
+
+For unattended execution-capable Lab agents, the run directory should be the workspace root and arbitrary host-shell access should be out of bounds. If the ecosystem provides a shell-like capability that remains scoped to that workspace boundary, Lab may evaluate it, but writing a bespoke simulated shell is not part of the MVP.
+
+Lab should not rely on one-off permission approvals as its primary safety model, and it should not treat unsandboxed broad shell access as acceptable for end-to-end testing.
 
 The runtime binding is an instance projection, not the canonical source of Lab behavior.
 
@@ -268,7 +272,7 @@ The system assumes three broad capability tiers:
 3. Full-execution agents
    - can use a dedicated execution environment when required
 
-For local POC and downstream testing, containment is mandatory for execution-capable roles. Broad tool access is acceptable only inside a masked filesystem boundary that restricts writes to the current run directory and its `bench/` work surface, with any broader access treated as an explicit exception.
+For local POC and downstream testing, containment is mandatory for execution-capable roles. The run directory should be the workspace root, and arbitrary host-shell access should not be part of the run path. If an existing ecosystem capability can provide shell-like behavior while staying scoped to the run workspace, that is acceptable to evaluate; a bespoke shell implementation is not an MVP goal.
 
 For unattended runs, permission prompts are not a viable capability model. Lab should provide a declared tool contract for the run-scoped workspace and should fail before launch when the projected binding does not match that contract.
 
@@ -282,6 +286,8 @@ This design prefers repo-owned canon with disposable live instances.
 
 Runtime-specific bindings may differ across runtimes in the future, but the Lab repo should remain the canonical home for the portable parts of the system.
 
+The canonical wrapper path should be Python-based so the primary control plane remains cross-platform rather than bash-dependent.
+
 ## Planning Boundary
 
 The design is:
@@ -290,7 +296,7 @@ The design is:
 - Lab produces the executable plan
 - execution runs from the approved plan
 
-Planning may be implemented as behavior of the orchestrator or as a dedicated planning role.
+Planning is owned by the orchestrator unless a later, compelling reason justifies a separate planning role.
 
 ## Brief Contract
 
@@ -445,9 +451,7 @@ The high-level flow is:
 
 The design still leaves open:
 
-- exact directory layouts
 - exact agent roster
 - exact gate rules
 - exact cleanup policy
-- exact sandbox implementation
 - the exact portability boundary between Lab canon and runtime-specific binding

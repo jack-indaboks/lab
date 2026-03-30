@@ -37,7 +37,7 @@ Current POC usage assumes:
 
 The current wrapper source lives in `bin/ai-lab` in this repo.
 
-Current status note: the shell wrapper is an early POC launcher. The long-term control-plane architecture is still in development.
+Current status note: the shell wrapper is an early POC launcher. The intended canonical control plane is a Python wrapper so the main Lab path is not tied to bash semantics.
 
 For a project-local OpenCode instance, the expected shape is that this repo is instantiated into the project's `.opencode/` directory structure.
 
@@ -85,6 +85,8 @@ Resolves the requested slug to a run under `.ai-lab/`, reads the run's `record/p
 - `.ai-lab/` always lives at the project root.
 - Every Lab run is intended to be bench-scoped.
 - The current shell wrapper has not yet been fully realigned to the bench-first design.
+- The checked-in OpenCode permission profile still reflects an older POC baseline and is not yet the intended unattended capability contract.
+- The intended unattended boundary is the run directory as workspace root, without arbitrary host-shell access.
 - The wrapper fails fast when required structure or required git operations are missing.
 
 ## Current Limitations
@@ -94,9 +96,12 @@ Lab is still in early implementation.
 Current limitations include:
 
 - the wrapper is drafted but not yet fully aligned to the current bench-first architecture
+- the canonical Python wrapper rewrite is still ahead
 - hardening work such as stronger confinement, schemas, and registries is still ahead
 - the prompts are first-pass POC prompts and will likely change after runtime testing
 - the current OpenCode integration still needs a declared headless tool contract rather than prompt-time capability discovery
+- the MVP developer toolbox still needs to be assembled from the OpenCode ecosystem rather than assumed through ambient shell access
+- if a workspace-scoped shell-like capability exists in the ecosystem, Lab may use it; Lab is not meant to ship a bespoke simulated shell
 - template-readiness and downstream portability work have not happened yet
 
 For the detailed design vision, read `DESIGN.md`.

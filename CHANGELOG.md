@@ -78,3 +78,6 @@
 - added POC work items for bench-rooted OpenCode sessions, declared headless tool contracts, removal of `ask`-based capability discovery, and projection-drift checks
 - revised the `.ai-lab` layout to make each run self-contained under `.ai-lab/<run-id>/` with sibling `record/` and `bench/` subdirectories, and updated the runtime model so OpenCode sessions are rooted at the run directory
 - aligned the README, design responsibilities, roadmap state, and agent prompts to the run-rooted `record/` plus `bench/` model so the canon now matches the pivot point cleanly
+- updated the roadmap to make the Python wrapper rewrite and OpenCode-ecosystem toolbox assembly explicit POC work, and removed the stale duplicate Python-wrapper item from Local Hardening
+- clarified in the canon that Lab's product requirement is a curated, cross-platform developer toolbox assembled from the runtime ecosystem, with Python as the intended canonical control plane rather than bash-dependent wrapper behavior
+- resolved the stale planner question by keeping planning with the orchestrator, and tightened containment language so unattended runs are rooted at the run directory without arbitrary host-shell access while any shell-like capability must come from the existing ecosystem rather than a bespoke MVP implementation

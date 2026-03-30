@@ -2,10 +2,6 @@
 
 This roadmap tracks the work milestones and release milestones between the current Lab scaffold and the design vision described in `DESIGN.md`.
 
-## Open Questions
-
-- Should planning be owned by the orchestrator or a dedicated planner role?
-
 ## POC (`0.0.1`)
 
 Goal: a fresh clone of the template can be configured, run end to end, and produce a usable report.
@@ -18,25 +14,49 @@ Goal: a fresh clone of the template can be configured, run end to end, and produ
 - [x] Define the wrapper, orchestrator, and subagent boundary contract for run setup, state updates, delegation, and stopping behavior.
 - [x] Tighten the first-pass agent prompts so each role has explicit read/write targets and stop conditions.
 - [x] Implement the first `ai-lab` wrapper around OpenCode.
-- [x] Reframe Lab canon around the bench-first laboratory model rather than direct repo execution.
-- [ ] Make every run use a run-rooted workspace with `record/` and `bench/` subdirectories.
-- [ ] Root headless OpenCode sessions in the run directory instead of the live project root.
-- [ ] Define the minimum headless tool contract for unattended run-scoped sessions.
-- [ ] Remove `ask`-based capability discovery from unattended execution paths.
-- [ ] Add projection integrity checks so a run fails closed when the `.opencode` projection drifts from the expected Lab capability profile.
-- [ ] Mask the OpenCode process filesystem so the repo is readable but writes are limited to the current run directory and its bench work surface.
-- [ ] Produce a usable end-to-end run report from a fresh-clone template run.
-  - [ ] Do not resume end-to-end testing until containment is in place.
-  - [ ] Do not resume end-to-end testing until the run directory is the actual agent workspace boundary.
-  - [ ] Validate the wrapper in a project-local `.opencode` instance.
-  - [ ] `ai-lab plan <brief>` generates a usable plan artifact from a brief.
-  - [ ] `ai-lab run <slug>` executes an approved plan and writes run artifacts.
+- [x] Reframe the canon around the bench-first laboratory model.
+- [x] Define the run-rooted workspace layout with `record/` and `bench/` subdirectories.
+- [ ] Converge architecture and containment.
+  - Reflect the Docker containment direction in canon.
+  - Make testing freeze and reopen conditions explicit.
+  - Reduce the remaining work in this phase to scaffolding rather than unresolved architecture.
+  - Redistribute these items to their appropriate places:
+    ```text
+    [ ] Rewrite the wrapper in Python around the run-rooted workspace layout.
+      - [ ] Launch headless OpenCode sessions from the run directory.
+      - [ ] Define the headless tool contract for unattended runs.
+      - [ ] Replace `ask`-based capability discovery with declared allow/deny profiles.
+      - [ ] Add projection-drift checks before headless launch.
+      - [ ] Make the run directory the workspace root for unattended runs.
+      - [ ] Keep arbitrary host-shell access out of the headless run path.
+      - [ ] Keep the canonical control plane cross-platform rather than bash-dependent.
+    [ ] Assemble the MVP developer toolbox from the OpenCode ecosystem.
+      - [ ] Evaluate which built-ins, plugins, MCP servers, commands, and skills are required for unattended Lab runs.
+      - [ ] Define the minimum blessed toolbox for planning, validation, reporting, and bench-scoped implementation work.
+      - [ ] Identify which required capabilities are already available from the ecosystem and which remain genuine gaps.
+      - [ ] Keep the MVP toolbox curated and explicit rather than relying on ambient shell access.
+      - [ ] Prefer cross-platform capabilities in the blessed toolbox rather than bash-only assumptions.
+      - [ ] If a workspace-scoped shell-like capability already exists in the ecosystem, evaluate it; do not build a bespoke one for MVP.
+    [ ] Produce a usable end-to-end run report from a fresh-clone template run.
+      - [ ] Do not resume end-to-end testing until the run directory is the agent workspace boundary.
+      - [ ] Do not resume end-to-end testing while arbitrary host-shell access remains part of the run path.
+      - [ ] Validate the Python wrapper in a project-local `.opencode` instance.
+      - [ ] Produce a usable `record/plan.md` from `ai-lab plan <brief>`.
+      - [ ] Produce a usable `record/report.md` from `ai-lab run <slug>`.
+    ```
+- [ ] Establish the runtime and POC execution surface.
+  - Put the main runtime path in place as a real execution surface.
+  - Make wrapper, binding, and containment surfaces sufficient to support a bounded slice attempt.
+  - Reduce the remaining POC work to the bounded Digest reproduction.
+- [ ] Reproduce a single Digest slice.
+  - Run one bounded Digest slice through Lab.
+  - Produce the expected artifacts and validation outputs.
+  - Document the remaining gaps to a fuller migration clearly.
 
 ## Local Hardening
 
 Goal: make the template reliable enough for repeated local use and clearer iteration.
 
-- [ ] Rewrite the wrapper in Python as the canonical control plane.
 - [ ] Refine the plan artifact format.
 - [ ] Define the run metadata format.
 - [ ] Define the validator result format.
