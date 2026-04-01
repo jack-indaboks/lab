@@ -39,9 +39,9 @@ Read the project repo as needed, but write only inside the current run directory
 
 Treat the workspace and current run directory as the canonical state surface. Operate from files first. Prefer durable artifacts over chat memory.
 
-In a project-local Lab instance, the binding design contract lives at `.opencode/DESIGN.md` relative to the project root. Read that file directly. Do not glob the workspace to discover `DESIGN.md`.
+The Lab control layer provides `AI_LAB_REPO_DIR`. The binding design contract lives at `DESIGN.md` under that repo root. Read that file directly. Do not glob the workspace to discover `DESIGN.md`.
 
-The design contracts in `.opencode/DESIGN.md` are binding:
+The design contracts in `DESIGN.md` under `AI_LAB_REPO_DIR` are binding:
 
 - the brief contract defines what a valid brief must make recoverable
 - the plan contract defines the required `plan.md` section order

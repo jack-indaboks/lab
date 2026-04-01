@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document describes the intended final design of the Lab system.
+This document describes the intended final design of Lab: a CLI-first, file-native agent laboratory that takes a brief, generates an executable plan, carries out the work inside an isolated bench, validates results as the run progresses, loops through revised attempts when needed, and preserves a durable run record for review in the project workspace.
 
 ## Goal
 
@@ -10,25 +10,27 @@ Provide a file-native agent laboratory where:
 
 - input begins with a brief
 - Lab generates an executable plan from that brief
-- execution happens through a runtime binding rooted in a prepared bench
-- the workspace remains the canonical home for run state, logs, artifacts, and reports
+- Lab is provisioned and run by a Python control layer
+- execution happens inside a containerized Lab runtime rooted in a prepared bench
+- OpenCode is used as the per-process execution substrate inside the run root
+- the project workspace remains the canonical home for run state, logs, artifacts, and reports
 - an orchestrator agent provisions specialized subagents as needed
-- agents operate inside a controlled developer work surface rather than directly against the live project root
-- most agents work only with files, while a smaller set may use tools or sandboxed execution
+- agents operate inside a controlled in-container developer work surface
+- most agents work only with files, while a smaller set may use tools or contained shell execution
 - output ends with a run report backed by preserved logs
 
 ## Core Shape
 
 The system has four major parts:
 
-1. VS Code workspace
-2. runtime binding
-3. Run-scoped execution environments for selected agents
-4. A curated developer toolbox assembled from runtime built-ins and ecosystem extensions where needed
+1. client-side project workspace
+2. Python Lab control layer
+3. containerized Lab runtime
+4. internal agent runtime and toolbox assembled from OpenCode plus selected supporting capabilities
 
 ## Workspace Role
 
-The workspace is the canonical shared state surface.
+The project workspace is the canonical shared state surface.
 
 Examples of state stored in the workspace:
 
@@ -40,21 +42,23 @@ Examples of state stored in the workspace:
 - validation outputs
 - reports
 
-The workspace is not a transient cache. It is the persistent record of a run.
+The project workspace is not a transient cache. It is the persistent record of a run.
 
 In project instances, this design assumes a three-part split:
 
 - canonical Lab source
-- runtime-specific binding
-- generated project-local Lab runtime state
+- user-editable runtime definitions
+- contained Lab runtime plus durable run state
 
 Every run gets a run-rooted workspace. Each run directory contains both the durable run record and the bench work surface.
 
 The naming model is:
 
 - `lab`: canonical repo
-- active runtime binding: one current Lab projection for a supported runtime, which may live in a project, in home config, as a symlink, or as a direct clone
-- `.ai-lab`: generated run state inside the project being worked on
+- `lab` CLI: the user-facing command surface
+- user-editable `.opencode/`: runtime definitions, custom agents, and related OpenCode-native configuration consumed by Lab
+- Python control layer: the component that owns run setup, execution, and artifact exposure
+- `.ai-lab`: durable run state and exported artifacts for operator inspection
 - `.ai-lab/<run-id>/record/`: durable run record for a run
 - `.ai-lab/<run-id>/bench/`: isolated execution checkout and agent workspace for a run
 
@@ -62,29 +66,31 @@ Runtime state should use deterministic run-id-based subdirectories in the form `
 
 ## Runtime Role
 
-The runtime binding is responsible for:
+The Python control layer is responsible for:
 
-- loading reusable agent definitions
+- loading user-editable runtime definitions
+- creating runs, benches, and top-level run artifacts
+- materializing source context into the in-container bench
 - running the orchestrator agent
 - allowing the orchestrator agent to invoke specialized subagents
 - enforcing per-agent permissions and tool access
 - carrying out unattended execution once a plan is approved for run
-- exposing a predictable tool contract inside the run workspace so unattended agents do not discover capabilities by crashing into denied tools
+- exposing logs, bench state, and run artifacts for operator inspection after execution
 
-The product requirement is a known developer toolbox inside the run workspace, not arbitrary host shell execution. Lab should prefer a curated mix of runtime built-ins, plugins, MCP servers, commands, skills, and other ecosystem-provided capabilities before treating shell access as part of the answer.
+The Lab command surface is exposed through the `lab` CLI. The CLI remains thin and forwards operator intent from the client-side project workspace to the Python control layer without taking ownership of orchestration or run state.
 
-For unattended execution-capable Lab agents, the run directory should be the workspace root and arbitrary host-shell access should be out of bounds. If the ecosystem provides a shell-like capability that remains scoped to that workspace boundary, Lab may evaluate it, but writing a bespoke simulated shell is not part of the MVP.
+The contained run workspace provides the developer toolbox for execution. Inside the container boundary, Lab may expose a broad developer toolbox, including shell access, while keeping execution confined to the in-container bench for the run.
 
-Lab should not rely on one-off permission approvals as its primary safety model, and it should not treat unsandboxed broad shell access as acceptable for end-to-end testing.
+The containment boundary is the containerized Lab runtime and its in-container bench. Unattended execution relies on that containment boundary and the declared runtime capability profile.
 
-The runtime binding is an instance projection, not the canonical source of Lab behavior.
+OpenCode is the internal execution substrate for Lab. Lab invokes OpenCode per process inside the current run root.
 
-The location of that projection is flexible.
+User-editable OpenCode-native configuration remains important because operators need to define custom agents and similar behavior without rebuilding the container image.
 
-The location of `.ai-lab` is not: it belongs in the project being operated on.
+Lab exposes `.ai-lab` as the durable run surface visible to the operator.
 
-The bench is not optional convenience scaffolding. It is the laboratory work surface.
-Lab should not treat direct execution against the live project root as the normal operating model.
+The bench is the laboratory work surface.
+Execution takes place in the contained bench.
 
 ## .ai-lab Contract
 
@@ -114,7 +120,7 @@ Expected structure:
 
 Creation rules:
 
-- the wrapper creates `.ai-lab/`, `.ai-lab/<run-id>/`, `.ai-lab/<run-id>/record/`, `.ai-lab/<run-id>/bench/`, `record/run.json`, and `record/timeline.ndjson`
+ the Python control layer creates `.ai-lab/`, `.ai-lab/<run-id>/`, `.ai-lab/<run-id>/record/`, `.ai-lab/<run-id>/bench/`, `record/run.json`, and `record/timeline.ndjson`
 - the brief and plan must exist before execution begins
 - the orchestrator creates `record/orchestrator/`, `record/steps/`, step directories, and per-invocation directories as execution proceeds
 - the reporter creates `record/report.md`
@@ -136,9 +142,9 @@ The minimum run contract is:
 - `record/steps/`: execution steps and their worker and validator attempts
 - `bench/`: the run bench and agent work surface
 
-The wrapper should create the run directory itself and initialize the top-level artifacts that exist before planning or execution begins.
+ The Python control layer creates the run directory and initializes the top-level artifacts that exist before planning or execution begins.
 
-At minimum, wrapper-created run artifacts are:
+At minimum, control-plane-created run artifacts are:
 
 - `record/run.json`
 - `record/timeline.ndjson`
@@ -197,33 +203,38 @@ The orchestrator agent is expected to:
 - continue iteration until completion criteria are met
 - hand off to a reporting agent at the end
 
-This design does not assume a hard-coded workflow engine as the primary source of orchestration logic.
+This design uses agent-driven orchestration rather than a hard-coded workflow engine.
 
-The Lab should remain as portable as practical. Runtime-specific assumptions should stay near the execution layer rather than being spread across every artifact and prompt.
+The Lab remains as portable as practical. Runtime-specific assumptions stay near the execution layer.
 
 ## Responsibility Boundaries
 
-The wrapper, orchestrator, and subagents have distinct responsibilities. These boundaries exist to keep ownership clear, avoid duplicated state management, and prevent prompt logic from becoming the accidental source of truth.
+The CLI surface, Python control layer, orchestrator, and subagents have distinct responsibilities. These boundaries keep ownership clear, avoid duplicated state management, and prevent prompt logic from becoming the accidental source of truth.
 
-### Wrapper Responsibilities
+### CLI Responsibilities
 
-The wrapper owns run setup and invocation framing.
+The CLI surface owns command invocation and operator ergonomics.
 
-At minimum, the wrapper is responsible for:
+The CLI stays thin and forwards the Lab command surface to the Python control layer.
 
-- determining whether the invocation is in planning mode or run mode
+### Python Control Layer Responsibilities
+
+The Python control layer owns run setup, containment, execution, and artifact exposure.
+
+At minimum, the Python control layer is responsible for:
+
 - creating `.ai-lab/` and `.ai-lab/<run-id>/`
 - creating `.ai-lab/<run-id>/record/` and `.ai-lab/<run-id>/bench/`
 - initializing `record/run.json` and `record/timeline.ndjson`
+- materializing source context into the in-container bench
 - ensuring the orchestrator is launched with an unambiguous current run context
-- ensuring the runtime binding is rooted in the run directory so both `record/` and `bench/` are inside the workspace boundary
-- failing closed when the projected Lab binding has drifted from the expected headless capability profile
-
-The wrapper should not perform orchestration logic, interpret validation results, or silently rewrite run artifacts that belong to the orchestrator.
+- ensuring execution happens inside the contained bench work surface
+- exposing run artifacts, logs, and bench state for inspection after execution
+- failing closed when the effective runtime configuration does not match the expected unattended capability profile
 
 ### Orchestrator Responsibilities
 
-The orchestrator owns run-level interpretation, delegation, and continuity once the wrapper has established the run.
+The orchestrator owns run-level interpretation, delegation, and continuity once the Python control layer has established the run.
 
 At minimum, the orchestrator is responsible for:
 
@@ -236,7 +247,7 @@ At minimum, the orchestrator is responsible for:
 - recording durable clarification requests and blocked states
 - ensuring `record/report.md` exists when the run completes or stops in a review-worthy state
 
-The orchestrator should not assume that subagents will maintain top-level run state on its behalf.
+The orchestrator maintains top-level run state unless that responsibility is explicitly delegated.
 
 ### Subagent Responsibilities
 
@@ -249,11 +260,12 @@ At minimum, subagents are responsible for:
 - staying within the designated scope of the current step
 - returning enough information for the orchestrator to make the next decision
 
-Subagents should not take over orchestration, redefine the plan, mutate top-level run state, or infer broader authority than the orchestrator gave them.
+Subagents operate within the scope assigned by the orchestrator.
 
 ### Authority Model
 
-The wrapper establishes the run.
+The CLI surface invokes the run.
+The Python control layer establishes the run.
 The orchestrator manages the run.
 The subagents execute within the run.
 
@@ -272,9 +284,9 @@ The system assumes three broad capability tiers:
 3. Full-execution agents
    - can use a dedicated execution environment when required
 
-For local POC and downstream testing, containment is mandatory for execution-capable roles. The run directory should be the workspace root, and arbitrary host-shell access should not be part of the run path. If an existing ecosystem capability can provide shell-like behavior while staying scoped to the run workspace, that is acceptable to evaluate; a bespoke shell implementation is not an MVP goal.
+Containment is mandatory for execution-capable roles. Execution happens inside the containerized Lab runtime, rooted in the in-container bench for the current run. Inside that contained environment, Lab may expose the tools and shell surface needed for the run.
 
-For unattended runs, permission prompts are not a viable capability model. Lab should provide a declared tool contract for the run-scoped workspace and should fail before launch when the projected binding does not match that contract.
+For unattended runs, Lab provides a declared capability profile for the contained runtime and fails before launch when the effective runtime configuration does not match that profile.
 
 ## Reusable Agent Definitions
 
@@ -282,11 +294,11 @@ Specialized agent definitions should be defined once and reused where useful, bu
 
 Project work should keep run-specific state local to the workspace, while shared patterns and definitions can live in repo-owned canon.
 
-This design prefers repo-owned canon with disposable live instances.
+This design uses repo-owned canon with user-editable runtime definitions and disposable live instances.
 
-Runtime-specific bindings may differ across runtimes in the future, but the Lab repo should remain the canonical home for the portable parts of the system.
+Runtime-specific bindings may differ across runtimes, but the Lab repo remains the canonical home for the portable parts of the system.
 
-The canonical wrapper path should be Python-based so the primary control plane remains cross-platform rather than bash-dependent.
+The control path is Python-based. The CLI stays thin by forwarding the Lab command surface into the contained runtime.
 
 ## Planning Boundary
 
@@ -296,7 +308,7 @@ The design is:
 - Lab produces the executable plan
 - execution runs from the approved plan
 
-Planning is owned by the orchestrator unless a later, compelling reason justifies a separate planning role.
+Planning is owned by the orchestrator.
 
 ## Brief Contract
 
@@ -333,7 +345,7 @@ At minimum, a valid `plan.md` should include these sections in this order:
 
 Each section must be explicit enough for human review and resumable execution.
 
-`Execution Mode` should be stated explicitly. In the current design, execution is bench-first and the bench is mandatory for every run. If the plan distinguishes sub-modes later, that distinction must not weaken the requirement that the agent operates inside the run bench.
+`Execution Mode` should be stated explicitly. Execution is bench-first and the bench is mandatory for every run. If the plan distinguishes sub-modes, that distinction must not weaken the requirement that the agent operates inside the run bench.
 
 `Execution Sequence` should describe the run as an ordered series of orchestrator-dispatched execution units rather than as generic prose steps.
 
@@ -434,7 +446,7 @@ Parallel agents should not share the same writable execution environment.
 
 Where agents need real execution capability, each parallel execution unit should have its own isolated working area and should write logs and artifacts only to its designated output locations.
 
-For each run, the preferred isolated working area is the run-specific `bench/` directory under `.ai-lab/<run-id>/bench/`.
+For each run, the preferred isolated working area is the run-specific `bench/` directory under `.ai-lab/<run-id>/bench/` inside the contained Lab runtime.
 
 ## Review Flow
 
@@ -451,6 +463,9 @@ The high-level flow is:
 
 The design still leaves open:
 
+- the exact client-side transport for invoking the contained runtime
+- the exact mechanism for copying project contents into the bench and copying result artifacts back out
+- the exact client-visible relationship between `.opencode/`, `.ai-lab/`, and the containerized runtime
 - exact agent roster
 - exact gate rules
 - exact cleanup policy

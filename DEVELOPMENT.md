@@ -16,6 +16,42 @@ Use this file for:
 - `CHANGELOG.md`: completed changes, including roadmap updates
 - `DEVELOPMENT.md`: maintainer-facing workflow, testing practice, and document boundaries
 
+## Standalone Repo Shape
+
+The Lab source repo is a standalone application repo. It is not structured as a project-local `.opencode` projection.
+
+The minimal accepted repo shape for the current POC is:
+
+```text
+lab/
+  README.md
+  DESIGN.md
+  ROADMAP.md
+  DEVELOPMENT.md
+  CHANGELOG.md
+  pyproject.toml
+  lab/
+    __main__.py
+    cli.py
+    control.py
+  opencode/
+```
+
+Interpretation:
+
+- repo-root documents remain project-level files
+- `pyproject.toml` is the Python project manifest for running and installing Lab
+- `lab/` is the Python package that contains the Lab control-layer code and executable entrypoint
+- `opencode/` is the repo-owned surface for Lab's OpenCode-related files
+- runtime-created state such as runs, records, and benches is not part of the checked-in source structure
+
+This shape is deliberately minimal. It is intended to support the basic test model:
+
+1. spin up a generic Ubuntu container
+2. clone the Lab repo
+3. install dependencies
+4. run Lab
+
 ## Source And Projection Workflow
 
 Lab development uses two surfaces:

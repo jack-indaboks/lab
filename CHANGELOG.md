@@ -64,12 +64,14 @@
 - updated `.gitignore` to ignore project-local `.ai-lab/` runtime state
 - refocused `README.md` into a user-facing installation and usage guide, including the project-local `.git` / `.opencode` / `.ai-lab` instance shape and current wrapper behavior
 - revised `ROADMAP.md` so wrapper implementation is marked complete, POC remains milestone-oriented, and filesystem masking moves to Local Hardening
-*Commit: 750b370 first-executable*
+*Commit: 7f7278a first-executable*
 
 - added explicit `glob` permission in `opencode.json` so noninteractive orchestrator runs do not auto-reject common file-discovery calls
 - updated `lab-orchestrator.md` to read the project-local `.opencode/DESIGN.md` contract directly instead of discovering `DESIGN.md` by glob
 - added guardrails in `lab-orchestrator.md` so wrapper-populated top-level run fields are not blanked during orchestration updates
 - replaced `DOCS.md` with `DEVELOPMENT.md` as the maintainer-facing canon for development workflow, projection testing workflow, and document-update discipline
+*Commit: 0aa48a5 DEVELOPMENT*
+
 - changed the local permission baseline so execution-capable Lab agents get standard workspace shell access by default instead of one-off `bash` approvals
 - aligned `DESIGN.md`, `DEVELOPMENT.md`, `lab-orchestrator.md`, `lab-worker.md`, and `lab-validator.md` to that standard-tool execution model
 - moved filesystem containment back into the POC gate and paused end-to-end testing until execution-capable roles run inside a masked filesystem boundary or equivalent sandbox
@@ -78,6 +80,20 @@
 - added POC work items for bench-rooted OpenCode sessions, declared headless tool contracts, removal of `ask`-based capability discovery, and projection-drift checks
 - revised the `.ai-lab` layout to make each run self-contained under `.ai-lab/<run-id>/` with sibling `record/` and `bench/` subdirectories, and updated the runtime model so OpenCode sessions are rooted at the run directory
 - aligned the README, design responsibilities, roadmap state, and agent prompts to the run-rooted `record/` plus `bench/` model so the canon now matches the pivot point cleanly
+*Commit: 17b2eb4 mandatory bench pivot*
+
+## 2026-03-30
+
 - updated the roadmap to make the Python wrapper rewrite and OpenCode-ecosystem toolbox assembly explicit POC work, and removed the stale duplicate Python-wrapper item from Local Hardening
 - clarified in the canon that Lab's product requirement is a curated, cross-platform developer toolbox assembled from the runtime ecosystem, with Python as the intended canonical control plane rather than bash-dependent wrapper behavior
 - resolved the stale planner question by keeping planning with the orchestrator, and tightened containment language so unattended runs are rooted at the run directory without arbitrary host-shell access while any shell-like capability must come from the existing ecosystem rather than a bespoke MVP implementation
+*Commit: e8e14b3 toolbox-version*
+
+## 2026-03-31
+
+- refined `DESIGN.md` to the current standalone Lab model: CLI-first, Python control layer, contained runtime, project-workspace language, and run-rooted `record/` plus `bench/` state
+- reshaped `ROADMAP.md` around the contained architecture, the standalone repo transition, and the runtime-focused next POC block, and marked the design/containment phase complete
+- defined the minimal standalone Lab source-repo shape in `DEVELOPMENT.md`, including a Python package entrypoint under `lab/`, a project-level `pyproject.toml`, and a repo-owned `opencode/` surface
+- moved the Lab-owned OpenCode files into the repo-owned `opencode/` surface by relocating `agents/` and `opencode.json` under `opencode/`
+- added the initial Python project surface with `pyproject.toml` and the `lab/` package entrypoint, replacing the old shell executable in `bin/ai-lab`
+- updated `README.md` and the orchestrator prompt to use the repo-owned `opencode/` surface, the standalone clone-install-run model, and the canonical run-rooted runtime shape

@@ -21,5 +21,9 @@
 # Ad hoc logs
 *.log
 
+# Python cache
+__pycache__/
+*.pyc
+
 # Local reference imports and private analysis notes
 /.imports/
