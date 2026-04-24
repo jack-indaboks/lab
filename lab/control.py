@@ -13,6 +13,13 @@ from pathlib import Path
 PROGRAM_NAME = "lab"
 REPO_DIR = Path(__file__).resolve().parent.parent
 OPENCODE_CONFIG_PATH = REPO_DIR / "opencode" / "opencode.json"
+OPENCODE_AGENTS_DIR = REPO_DIR / "opencode" / "agents"
+REQUIRED_AGENT_NAMES = (
+    "lab-orchestrator",
+    "lab-worker",
+    "lab-validator",
+    "lab-reporter",
+)
 
 
 class LabError(RuntimeError):
@@ -24,6 +31,7 @@ class RunContext:
     project_dir: Path
     run_id: str
     run_dir: Path
+    record_dir: Path
     bench_dir: Path
     run_json_path: Path
     timeline_path: Path
@@ -44,7 +52,7 @@ def usage() -> str:
         "Current POC behavior:\n"
         "  - runs from a git project root\n"
         "  - resolves repo-owned OpenCode assets through opencode/opencode.json\n"
-        "  - creates runtime state under .ai-lab/\n"
+        "  - creates runtime state under .ai-lab/<run-id>/record and bench\n"
         "  - uses git worktree for bench-mode runs\n"
     )
 
@@ -130,14 +138,17 @@ def write_run_json(context: RunContext, phase: str, status: str, execution_mode:
 
 
 def ensure_ai_lab_root(project_dir: Path) -> None:
-    (project_dir / ".ai-lab" / "runs").mkdir(parents=True, exist_ok=True)
-    (project_dir / ".ai-lab" / "benches").mkdir(parents=True, exist_ok=True)
+    (project_dir / ".ai-lab").mkdir(parents=True, exist_ok=True)
+
+
+def run_root(project_dir: Path) -> Path:
+    return project_dir / ".ai-lab"
 
 
 def next_run_id(project_dir: Path, base: str) -> str:
     candidate = base
     counter = 1
-    runs_root = project_dir / ".ai-lab" / "runs"
+    runs_root = run_root(project_dir)
     while (runs_root / candidate).exists():
         candidate = f"{base}-{counter:02d}"
         counter += 1
@@ -145,7 +156,7 @@ def next_run_id(project_dir: Path, base: str) -> str:
 
 
 def resolve_run_id(project_dir: Path, input_name: str) -> str:
-    runs_root = project_dir / ".ai-lab" / "runs"
+    runs_root = run_root(project_dir)
     direct = runs_root / input_name
     if direct.is_dir():
         return input_name
@@ -155,7 +166,9 @@ def resolve_run_id(project_dir: Path, input_name: str) -> str:
         [
             path.name
             for path in runs_root.iterdir()
-            if path.is_dir() and (path.name.endswith(f"_{normalized_slug}") or path.name.endswith(f"_{normalized_slug}-01") or f"_{normalized_slug}-" in path.name)
+            if path.is_dir()
+            and (path / "record").is_dir()
+            and (path.name.endswith(f"_{normalized_slug}") or path.name.endswith(f"_{normalized_slug}-01") or f"_{normalized_slug}-" in path.name)
         ],
         reverse=True,
     )
@@ -183,18 +196,46 @@ def opencode_env(context: RunContext | None = None, mode: str | None = None) -> 
     return env
 
 
-def require_agent(project_dir: Path, agent_name: str) -> None:
+def list_available_agents(workspace_dir: Path, context: RunContext | None = None) -> list[str]:
     result = subprocess.run(
         ["opencode", "agent", "list"],
-        cwd=project_dir,
-        env=opencode_env(),
+        cwd=workspace_dir,
+        env=opencode_env(context),
         check=True,
         capture_output=True,
         text=True,
     )
-    available = result.stdout.splitlines()
-    if not any(line.startswith(agent_name) for line in available):
-        fail(f"required OpenCode agent is not available from the repo-owned opencode surface: {agent_name}")
+    return result.stdout.splitlines()
+
+
+def add_projection_drift_checks(workspace_dir: Path, context: RunContext | None = None) -> None:
+    if not OPENCODE_CONFIG_PATH.is_file():
+        fail(f"missing repo-owned OpenCode config: {OPENCODE_CONFIG_PATH}")
+    if not OPENCODE_AGENTS_DIR.is_dir():
+        fail(f"missing repo-owned OpenCode agents directory: {OPENCODE_AGENTS_DIR}")
+
+    missing_definition_files = [
+        str(OPENCODE_AGENTS_DIR / f"{agent_name}.md")
+        for agent_name in REQUIRED_AGENT_NAMES
+        if not (OPENCODE_AGENTS_DIR / f"{agent_name}.md").is_file()
+    ]
+    if missing_definition_files:
+        fail(
+            "repo-owned OpenCode surface is incomplete; missing agent definitions: "
+            + ", ".join(missing_definition_files)
+        )
+
+    available_agents = list_available_agents(workspace_dir, context)
+    missing_agents = [
+        agent_name
+        for agent_name in REQUIRED_AGENT_NAMES
+        if not any(line.startswith(agent_name) for line in available_agents)
+    ]
+    if missing_agents:
+        fail(
+            "effective OpenCode agent surface does not match the repo-owned Lab surface; missing agents: "
+            + ", ".join(missing_agents)
+        )
 
 
 def extract_execution_mode(plan_path: Path) -> str:
@@ -216,27 +257,33 @@ def extract_execution_mode(plan_path: Path) -> str:
 
 def ensure_bench_worktree(bench_dir: Path) -> None:
     if bench_dir.exists():
-        subprocess.run(["git", "-C", str(bench_dir), "rev-parse", "--is-inside-work-tree"], check=True)
-        return
+        try:
+            subprocess.run(["git", "-C", str(bench_dir), "rev-parse", "--is-inside-work-tree"], check=True, capture_output=True)
+            return
+        except subprocess.CalledProcessError:
+            if any(bench_dir.iterdir()):
+                fail(f"existing bench directory is not a valid git worktree: {bench_dir}")
+            bench_dir.rmdir()
     subprocess.run(["git", "worktree", "add", str(bench_dir), "HEAD"], check=True)
 
 
-def invoke_opencode(project_dir: Path, context: RunContext, mode: str, message: str, attached_file: Path) -> None:
+def invoke_opencode(context: RunContext, mode: str, message: str, attached_file: Path) -> None:
+    attached_file_arg = str(attached_file.relative_to(context.run_dir))
     subprocess.run(
         [
             "opencode",
             "run",
             "--dir",
-            str(project_dir),
+            str(context.run_dir),
             "--agent",
             "lab-orchestrator",
             "--file",
-            str(attached_file),
+            attached_file_arg,
             "--title",
             context.run_id,
             message,
         ],
-        cwd=project_dir,
+        cwd=context.run_dir,
         env=opencode_env(context, mode),
         check=True,
     )
@@ -247,71 +294,76 @@ def planning_context(project_dir: Path, brief_source: Path) -> RunContext:
     brief_slug = slugify(brief_name)
     base_run_id = f"{run_id_timestamp()}_{brief_slug}"
     run_id = next_run_id(project_dir, base_run_id)
-    run_dir = project_dir / ".ai-lab" / "runs" / run_id
-    bench_dir = project_dir / ".ai-lab" / "benches" / run_id
+    run_dir = run_root(project_dir) / run_id
+    record_dir = run_dir / "record"
+    bench_dir = run_dir / "bench"
     return RunContext(
         project_dir=project_dir,
         run_id=run_id,
         run_dir=run_dir,
+        record_dir=record_dir,
         bench_dir=bench_dir,
-        run_json_path=run_dir / "run.json",
-        timeline_path=run_dir / "timeline.ndjson",
-        brief_path=run_dir / "brief.md",
-        plan_path=run_dir / "plan.md",
-        report_path=run_dir / "report.md",
+        run_json_path=record_dir / "run.json",
+        timeline_path=record_dir / "timeline.ndjson",
+        brief_path=record_dir / "brief.md",
+        plan_path=record_dir / "plan.md",
+        report_path=record_dir / "report.md",
     )
 
 
 def execution_context(project_dir: Path, slug: str) -> RunContext:
     run_id = resolve_run_id(project_dir, slug)
-    run_dir = project_dir / ".ai-lab" / "runs" / run_id
-    bench_dir = project_dir / ".ai-lab" / "benches" / run_id
+    run_dir = run_root(project_dir) / run_id
+    record_dir = run_dir / "record"
+    bench_dir = run_dir / "bench"
     return RunContext(
         project_dir=project_dir,
         run_id=run_id,
         run_dir=run_dir,
+        record_dir=record_dir,
         bench_dir=bench_dir,
-        run_json_path=run_dir / "run.json",
-        timeline_path=run_dir / "timeline.ndjson",
-        brief_path=run_dir / "brief.md",
-        plan_path=run_dir / "plan.md",
-        report_path=run_dir / "report.md",
+        run_json_path=record_dir / "run.json",
+        timeline_path=record_dir / "timeline.ndjson",
+        brief_path=record_dir / "brief.md",
+        plan_path=record_dir / "plan.md",
+        report_path=record_dir / "report.md",
     )
 
 
 def start_plan(project_dir: Path, brief_arg: str) -> str:
     brief_source = abspath_file(brief_arg)
     context = planning_context(project_dir, brief_source)
-    context.run_dir.mkdir(parents=True, exist_ok=True)
+    context.record_dir.mkdir(parents=True, exist_ok=True)
+    context.bench_dir.mkdir(parents=True, exist_ok=True)
+    add_projection_drift_checks(context.run_dir, context)
     shutil.copy2(brief_source, context.brief_path)
     context.timeline_path.write_text("", encoding="utf-8")
 
-    write_run_json(context, "planning", "initializing", "", "")
+    write_run_json(context, "planning", "initializing", "", str(context.bench_dir))
     append_timeline(context.timeline_path, "run_initialized", "created planning run directory")
     append_timeline(context.timeline_path, "brief_copied", "copied brief into run record")
 
-    write_run_json(context, "planning", "running", "", "")
+    write_run_json(context, "planning", "running", "", str(context.bench_dir))
     append_timeline(context.timeline_path, "planning_started", "invoking lab-orchestrator in planning mode")
 
     try:
         invoke_opencode(
-            project_dir,
             context,
             "plan",
             "Planning mode for the current Lab run. Read brief.md from the run directory, produce or revise plan.md there, validate the plan before stopping, and do not begin execution.",
             context.brief_path,
         )
     except subprocess.CalledProcessError as exc:
-        write_run_json(context, "planning", "failed", "", "")
+        write_run_json(context, "planning", "failed", "", str(context.bench_dir))
         append_timeline(context.timeline_path, "planning_failed", "opencode planning invocation exited non-zero")
         fail(f"planning failed for run {context.run_id}")
 
     if not context.plan_path.exists():
-        write_run_json(context, "planning", "failed", "", "")
+        write_run_json(context, "planning", "failed", "", str(context.bench_dir))
         append_timeline(context.timeline_path, "planning_failed", "planning exited without producing plan.md")
         fail(f"planning did not produce plan.md for run {context.run_id}")
 
-    write_run_json(context, "planning", "ready_for_review", "", "")
+    write_run_json(context, "planning", "ready_for_review", "", str(context.bench_dir))
     append_timeline(context.timeline_path, "planning_completed", "plan.md is ready for review")
     return context.run_id
 
@@ -326,24 +378,21 @@ def start_run(project_dir: Path, slug: str) -> str:
         fail(f"run is missing run.json: {context.run_id}")
     if not context.timeline_path.is_file():
         fail(f"run is missing timeline.ndjson: {context.run_id}")
+    add_projection_drift_checks(context.run_dir, context)
 
     execution_mode = extract_execution_mode(context.plan_path)
-    bench_path = ""
-    if execution_mode == "artifact":
-        context.bench_dir = Path()
-    elif execution_mode == "bench":
-        ensure_bench_worktree(context.bench_dir)
-        bench_path = str(context.bench_dir)
-        append_timeline(context.timeline_path, "bench_ready", "bench worktree is ready for run execution")
-    else:
-        fail("plan.md must declare Execution Mode as artifact or bench")
+    if execution_mode != "bench":
+        fail("plan.md must declare Execution Mode as bench for unattended runs")
+
+    ensure_bench_worktree(context.bench_dir)
+    bench_path = str(context.bench_dir)
+    append_timeline(context.timeline_path, "bench_ready", "bench worktree is ready for run execution")
 
     write_run_json(context, "execution", "running", execution_mode, bench_path)
     append_timeline(context.timeline_path, "run_started", "invoking lab-orchestrator in run mode")
 
     try:
         invoke_opencode(
-            project_dir,
             context,
             "run",
             "Run mode for the current Lab run. Treat plan.md as the execution contract, execute the approved plan step by step, maintain run artifacts, and stop only when the run has reached a reviewable end state.",
@@ -383,12 +432,8 @@ def main(argv: list[str] | None = None) -> int:
 
     require_command("git")
     require_command("opencode")
-    if not OPENCODE_CONFIG_PATH.is_file():
-        fail(f"missing repo-owned OpenCode config: {OPENCODE_CONFIG_PATH}")
-
     project_dir = resolve_project_dir()
     ensure_ai_lab_root(project_dir)
-    require_agent(project_dir, "lab-orchestrator")
 
     if command == "plan":
         print(start_plan(project_dir, args[0]))

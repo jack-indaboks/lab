@@ -44,10 +44,12 @@ myRepo/
 
 ## Prerequisites
 
-Current POC usage assumes:
+Current source-only development assumes:
 
 - `git` is installed
 - `python` is installed
+
+The contained runtime for the POC is not in place yet. Containerized execution and Lima-specific bring-up remain environment work, not validated usage.
 - `opencode` is installed and working
 - the repo checkout already has a `.git/` entry at its root
 - the repo-owned `opencode/` surface exposes the Lab agent roster, including `lab-orchestrator`

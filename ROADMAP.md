@@ -27,47 +27,35 @@ Goal: a fresh clone of the template can be configured, run end to end, and produ
     - [x] Move the Lab executable into the Python control-layer entrypoint.
     - [x] Relocate Lab-owned OpenCode files into a repo-owned surface that does not assume project-root `.opencode` placement.
     - [x] Update docs to describe the standalone clone-install-run path.
+- [x] Reconstruct and canonize the current Lab stack design after data loss.
+  - Reconstructed the stack from top-level architecture through wrapper flow and remote state.
+  - Reconfirmed what belongs to Lab, what belongs to local dev scaffolding, and what belongs to downstream project infrastructure.
+  - Canonized the control path, transport, containment model, runtime boundaries, and state surfaces in `DESIGN.md`.
 - [ ] Establish the runtime and POC execution surface.
-  - Put the contained Lab runtime in place as a real execution surface.
-  - Make the CLI surface, contained runtime, and run-rooted workspace sufficient to support a bounded slice attempt.
-  - Keep implementation work focused on the contained runtime path rather than later transport or packaging.
-  - Use the run root and bench as the real execution boundary from the first unattended run.
-  - Keep Lab's container setup isolated from downstream project infrastructure during implementation.
-  - Record the concrete runtime requirements that will define Lab's canonical container surface later.
-  - [x] Tighten the first-pass agent prompts so each role has explicit read/write targets and stop conditions.
-  - [x] Implement the first `ai-lab` command surface around OpenCode.
-  - [ ] Put the Python control layer in place around the run-rooted workspace layout.
-    - [ ] Launch OpenCode per process from the run root.
-    - [ ] Add projection-drift checks before unattended launch.
-    - [ ] Make the run directory the workspace root for unattended runs.
-    - [ ] Make the bench the execution boundary for unattended runs.
-    - [ ] Keep the control path cross-platform rather than bash-dependent.
-  - [ ] Define the unattended tool contract for contained runs.
-    - [ ] Replace `ask`-based capability discovery with declared allow/deny profiles.
-    - [ ] Fail before launch when the effective runtime capability profile is insufficient.
-  - [ ] Assemble the MVP developer toolbox from the OpenCode ecosystem.
-    - [ ] Evaluate which built-ins, plugins, MCP servers, commands, and skills are required for unattended Lab runs.
-    - [ ] Define the minimum blessed toolbox for planning, validation, reporting, and bench-scoped implementation work.
-    - [ ] Identify which required capabilities are already available from the ecosystem and which remain genuine gaps.
-    - [ ] Keep the MVP toolbox curated and explicit rather than relying on ambient capability.
-    - [ ] Prefer cross-platform capabilities in the blessed toolbox rather than bash-only assumptions.
-    - [ ] If a workspace-scoped shell-like capability already exists in the ecosystem, evaluate it; do not build a bespoke one for MVP.
-  - [ ] Produce a usable end-to-end run report from a fresh-clone template run.
-    - [ ] Validate the Python control layer in a project-local `.opencode` instance.
-    - [ ] Produce a usable `record/plan.md` from `ai-lab plan <brief>`.
-    - [ ] Produce a usable `record/report.md` from `ai-lab run <slug>`.
-    - [ ] Preserve logs, validation outputs, and invocation artifacts under `.ai-lab/<run-id>/record/`.
+  - [ ] Define the contained runtime shape for the local POC.
+  - [ ] Define how Lab uses Lima versus downstream project containers during local development.
+  - [ ] Document the minimum Lima and Docker bring-up path for a Lab run host.
+  - [ ] Decide how the Lab source, runtime bindings, and run workspace enter the contained environment.
+  - [x] Realign the control layer to create and manage the canonical `.ai-lab/<run-id>/record/` and `bench/` layout.
+  - [x] Launch OpenCode per process from the run root.
+  - [x] Add projection-drift checks before unattended launch.
+  - [x] Make the run directory the workspace root for unattended runs.
+  - [x] Make the bench the execution boundary for unattended runs.
+  - [ ] Validate the Python control layer inside the contained runtime.
+  - [ ] Produce a usable `record/plan.md` from `ai-lab plan <brief>` inside the contained runtime.
+  - [ ] Produce a usable `record/report.md` from `ai-lab run <slug>` inside the contained runtime.
+  - [ ] Preserve logs, validation outputs, and invocation artifacts under `.ai-lab/<run-id>/record/`.
 - [ ] Reproduce a single Digest slice.
-  - Use one bounded Digest slice as the proof that the contained POC works on real project work.
-  - Record what breaks, what generalizes, and what still belongs outside the POC.
   - [ ] Run one bounded Digest slice through Lab.
   - [ ] Produce the expected artifacts and validation outputs.
-  - [ ] Document the remaining gaps to a fuller migration clearly.
+  - [ ] Document the remaining blockers clearly.
 
 ## Local Hardening
 
 Goal: make the template reliable enough for repeated local use and clearer iteration.
 
+- [ ] Define the unattended execution defaults for contained runs.
+- [ ] Define how broad in-container tool access is applied and constrained by `/runs/<run-id>/`.
 - [ ] Refine the plan artifact format.
 - [ ] Define the run metadata format.
 - [ ] Define the validator result format.

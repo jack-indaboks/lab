@@ -2,7 +2,8 @@
 description: Executes a scoped implementation task and writes work products plus a concise work summary.
 mode: subagent
 permission:
-  bash: allow
+  bash:
+    "*": ask
   edit:
     "*": ask
 ---

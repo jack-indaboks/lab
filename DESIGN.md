@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document describes the intended final design of Lab: a CLI-first, file-native agent laboratory that takes a brief, generates an executable plan, carries out the work inside an isolated bench, validates results as the run progresses, loops through revised attempts when needed, and preserves a durable run record for review in the project workspace.
+This document describes the intended design of Lab as a containerized, remote-execution agent laboratory. Lab takes a brief, generates an executable plan, carries out the work inside an isolated bench within a containerized runtime, validates results as the run progresses, loops through revised attempts when needed, and preserves a durable run record for review in the project workspace.
 
 ## Goal
 
@@ -10,27 +10,76 @@ Provide a file-native agent laboratory where:
 
 - input begins with a brief
 - Lab generates an executable plan from that brief
-- Lab is provisioned and run by a Python control layer
+- Lab ships as a Docker image and all real Lab functionality lives inside the container
+- the client does not need OpenCode installed locally
 - execution happens inside a containerized Lab runtime rooted in a prepared bench
 - OpenCode is used as the per-process execution substrate inside the run root
-- the project workspace remains the canonical home for run state, logs, artifacts, and reports
+- the container is accessed over SSH
+- a thin client-side wrapper handles ingress, egress, and operator convenience without owning Lab functionality
+- the real workspace remains the durable operator-facing home for exported run state, logs, artifacts, and reports
 - an orchestrator agent provisions specialized subagents as needed
 - agents operate inside a controlled in-container developer work surface
 - most agents work only with files, while a smaller set may use tools or contained shell execution
 - output ends with a run report backed by preserved logs
 
-## Core Shape
+## Architecture Overview
 
-The system has four major parts:
+Lab is a remote execution system packaged as a Docker image.
+
+- the Lab runtime lives inside a Docker container
+- the container is reachable over SSH
+- the client-side wrapper copies workspace inputs into the runtime
+- the Lab runtime executes entirely inside the container
+- the wrapper copies the run directory back out into the real workspace after execution
+
+The system has five major parts:
 
 1. client-side project workspace
-2. Python Lab control layer
-3. containerized Lab runtime
-4. internal agent runtime and toolbox assembled from OpenCode plus selected supporting capabilities
+2. client-side wrapper and transfer surface
+3. Python Lab control layer inside the container
+4. containerized Lab runtime
+5. internal agent runtime assembled from OpenCode inside the run-scoped container workspace
 
-## Workspace Role
+The container boundary provides the execution environment:
 
-The project workspace is the canonical shared state surface.
+- execution-capable work happens entirely inside the container
+- the runtime can expose broad execution capability without exposing the client environment
+- the container can run anywhere as long as it is SSH-reachable
+- the client remains responsible only for transport and durable workspace synchronization
+
+## System Boundaries
+
+The client-side wrapper is a transport surface, not a second Lab runtime.
+
+Its responsibilities are:
+
+- copying project contents and config surfaces into the containerized runtime
+- invoking the remote Lab command surface over SSH
+- copying run outputs back into the real workspace
+- optionally exposing remote inspection paths for the operator
+
+It must not own planning, orchestration, validation policy, or run-state semantics.
+
+It must not require direct access to the contained runtime's internal control flow beyond remote invocation and file transfer.
+
+The wrapper boundary is tested by reduction to standard transport primitives. If a wrapper function cannot be reduced to remote invocation or file transfer over `ssh`, `scp`, or equivalent mechanisms, it does not belong to the wrapper.
+
+The contained Lab runtime owns all real Lab functionality.
+
+Its responsibilities are:
+
+- creating and managing runs inside the container
+- executing planning and run workflows
+- invoking OpenCode per process inside each run root
+- preserving run state, logs, and artifacts until they are exported
+
+It must not depend on direct access to the client environment.
+
+Lab ends at the SSH-reachable container boundary. Host-specific scaffolding such as Lima, host mounts, and local port-forward arrangements are environment details.
+
+## Workspace And Run Surfaces
+
+The project workspace is the durable operator-facing state surface.
 
 Examples of state stored in the workspace:
 
@@ -42,7 +91,17 @@ Examples of state stored in the workspace:
 - validation outputs
 - reports
 
-The project workspace is not a transient cache. It is the persistent record of a run.
+The project workspace is not a transient cache. It is the persistent exported record of a run after synchronization from the contained runtime.
+
+During execution, the live run state exists inside the container. The durable operator-facing record exists in the real workspace after export.
+
+For the POC:
+
+- the whole project workspace is copied into the container for simplicity
+- the copied project root becomes the bench root for the run
+- Lab operates directly on that copied tree
+- the whole remote run directory is copied back out to `.ai-lab/<run-id>/` when the run ends
+- there is no bidirectional sync during execution
 
 In project instances, this design assumes a three-part split:
 
@@ -57,33 +116,58 @@ The naming model is:
 - `lab`: canonical repo
 - `lab` CLI: the user-facing command surface
 - user-editable `.opencode/`: runtime definitions, custom agents, and related OpenCode-native configuration consumed by Lab
-- Python control layer: the component that owns run setup, execution, and artifact exposure
+- client-side wrapper: optional convenience layer for SSH-based ingress, egress, and inspection
+- Python control layer: the in-container component that owns run setup, execution, and artifact exposure
 - `.ai-lab`: durable run state and exported artifacts for operator inspection
 - `.ai-lab/<run-id>/record/`: durable run record for a run
 - `.ai-lab/<run-id>/bench/`: isolated execution checkout and agent workspace for a run
+- `.ai-lab/<run-id>/artifacts/`: exported outputs and other preserved run products
 
 Runtime state should use deterministic run-id-based subdirectories in the form `YYYY-MM-DD-HH-MM_slug`, using a local timestamp without a timezone suffix.
 
-## Runtime Role
+## Runtime Model
 
-The Python control layer is responsible for:
+The Python control layer inside the container is responsible for:
 
 - loading user-editable runtime definitions
 - creating runs, benches, and top-level run artifacts
 - materializing source context into the in-container bench
 - running the orchestrator agent
 - allowing the orchestrator agent to invoke specialized subagents
-- enforcing per-agent permissions and tool access
+- establishing the run-scoped execution workspace
 - carrying out unattended execution once a plan is approved for run
 - exposing logs, bench state, and run artifacts for operator inspection after execution
 
-The Lab command surface is exposed through the `lab` CLI. The CLI remains thin and forwards operator intent from the client-side project workspace to the Python control layer without taking ownership of orchestration or run state.
+The Lab command surface is exposed through `lab` inside the container. A client-side `lab` wrapper may mirror that command surface, but it remains a remote transport surface.
 
-The contained run workspace provides the developer toolbox for execution. Inside the container boundary, Lab may expose a broad developer toolbox, including shell access, while keeping execution confined to the in-container bench for the run.
+The contained run workspace provides the full execution surface for the run. Execution is default-enabled inside the container and constrained by the run-scoped workspace rooted at the current `/runs/<run-id>/` directory.
 
-The containment boundary is the containerized Lab runtime and its in-container bench. Unattended execution relies on that containment boundary and the declared runtime capability profile.
+The containment boundary is the containerized Lab runtime and its in-container bench. Unattended execution relies on that container boundary plus the run-scoped execution root.
 
 OpenCode is the internal execution substrate for Lab. Lab invokes OpenCode per process inside the current run root.
+
+The current execution model assumes broad tool availability, including shell access, inside the container. The controlling safety boundary is the disposable container plus the requirement that OpenCode operates inside `/runs/<run-id>/` for the active run.
+
+## Canonical POC Runtime Model
+
+The canonical POC runtime model is:
+
+- copy the whole project workspace into the container
+- place the copied project directly at the allocated bench root for the run
+- execute Lab directly against that copied tree
+- copy the whole run directory back out to `.ai-lab/<run-id>/` in the real workspace when the run ends
+- reuse a long-lived container across runs when convenient during development
+- keep the container disposable; the architecture must not depend on long-lived container state
+- allow multiple runs in one running container as long as each run is isolated under its own `/runs/<run-id>/` root
+- keep execution process-per-run even when the container is shared across runs
+- prefer a general troubleshooting shell over a forced `lab`-only SSH target during development
+- reserve a more locked-down `lab`-first SSH surface for later hardening
+- default-enable tools inside the container rather than curating a narrow toolbox
+- scope OpenCode execution to `/runs/<run-id>/` for the active run
+
+For the POC, there is no bidirectional sync during execution. Inspection can happen over SSH, but run-state export happens at the end of the run.
+
+The remote runtime is architecture-first and location-agnostic. The container may run locally, in a VM, or in cloud infrastructure as long as the wrapper can reach it over SSH.
 
 User-editable OpenCode-native configuration remains important because operators need to define custom agents and similar behavior without rebuilding the container image.
 
@@ -91,6 +175,44 @@ Lab exposes `.ai-lab` as the durable run surface visible to the operator.
 
 The bench is the laboratory work surface.
 Execution takes place in the contained bench.
+
+## Wrapper Invocation Contract
+
+For the POC, the client-side wrapper is expected to drive runs through a simple SSH and SCP sequence.
+
+### Planning Sequence
+
+1. Allocate or resolve the `run-id`.
+2. Ensure the remote `/runs/<run-id>/` root exists.
+3. Copy the whole workspace, including the brief, into `/runs/<run-id>/bench/`.
+4. Invoke `lab plan <run-id>` over SSH.
+5. Await completion by polling remote run state.
+6. Copy the generated plan back into the real workspace as a review artifact.
+
+### Execution Sequence
+
+1. Re-copy the whole workspace into `/runs/<run-id>/bench/`, including the approved plan and any host-side changes made during plan review.
+2. Invoke `lab run <run-id>` over SSH.
+3. Await completion by polling remote run state.
+4. Copy the full remote `/runs/<run-id>/` directory back into `.ai-lab/<run-id>/` in the real workspace.
+
+### Required Wrapper Behaviors
+
+- planning and execution use the same `run-id`
+- the wrapper treats the remote run root as the source of truth during execution
+- polling should read explicit remote run-state artifacts such as `record/run.json` and `record/timeline.ndjson`, rather than relying only on process attachment
+- the second workspace copy is authoritative for execution and is expected to include plan-review changes
+- for the POC, no mid-run synchronization is required
+
+### POC Transfer Scope
+
+For the POC, transfer behavior is intentionally coarse-grained:
+
+- ingress copies the whole workspace into the bench
+- plan egress copies the generated plan out for review
+- final egress copies the whole run root out for inspection and retention
+
+Future optimizations may narrow transfer scope, but the POC assumes whole-workspace ingress and whole-run export.
 
 ## .ai-lab Contract
 
@@ -116,11 +238,25 @@ Expected structure:
                worker-001/
                validator-001/
       bench/                      # mandatory isolated execution checkout and agent workspace
+      artifacts/                  # exported outputs and preserved run products
+```
+
+For the POC, this exported `.ai-lab/<run-id>/` directory is a copy of the full remote `/runs/<run-id>/` directory.
+
+The corresponding in-container run layout is:
+
+```text
+/runs/
+   <run-id>/
+      record/
+      bench/
+      artifacts/
 ```
 
 Creation rules:
 
- the Python control layer creates `.ai-lab/`, `.ai-lab/<run-id>/`, `.ai-lab/<run-id>/record/`, `.ai-lab/<run-id>/bench/`, `record/run.json`, and `record/timeline.ndjson`
+- the Python control layer creates `.ai-lab/`, `.ai-lab/<run-id>/`, `.ai-lab/<run-id>/record/`, `.ai-lab/<run-id>/bench/`, `record/run.json`, and `record/timeline.ndjson`
+- the Python control layer creates the corresponding remote `/runs/<run-id>/record/`, `/runs/<run-id>/bench/`, and `/runs/<run-id>/artifacts/` directories inside the container
 - the brief and plan must exist before execution begins
 - the orchestrator creates `record/orchestrator/`, `record/steps/`, step directories, and per-invocation directories as execution proceeds
 - the reporter creates `record/report.md`
@@ -168,6 +304,52 @@ The run contract should preserve enough information to answer at least these que
 For runs that modify project files, the run record should identify the corresponding run bench and whether the run operated in any narrower execution sub-mode defined by the plan.
 
 The bench is required even when the run is primarily file-native.
+
+### Remote State Contract
+
+The remote wrapper-facing state contract is intentionally small.
+
+At minimum, `record/run.json` should expose:
+
+- `run_id`: the deterministic run identifier
+- `phase`: one of `planning` or `execution`
+- `status`: one of `initializing`, `running`, `ready_for_review`, `completed`, `blocked`, or `failed`
+- `updated_at`: last state update timestamp
+- `bench_path`: the active remote bench path for the run
+- `execution_mode`: present when execution has begun and the mode is known
+
+The wrapper should treat `record/run.json` as the primary polling surface.
+
+At minimum, `record/timeline.ndjson` should append ordered events using a stable event name plus a concise message. The minimum event vocabulary is:
+
+- `run_initialized`
+- `workspace_staged`
+- `planning_started`
+- `planning_completed`
+- `planning_failed`
+- `execution_started`
+- `step_started`
+- `step_completed`
+- `validation_failed`
+- `run_blocked`
+- `run_completed`
+- `run_failed`
+
+The timeline is a supporting audit surface. It gives the wrapper and the operator progress detail beyond the top-level polling state.
+
+### Terminal Conditions
+
+For planning:
+
+- terminal success is `phase=planning` and `status=ready_for_review`, with `record/plan.md` present
+- terminal failure is `phase=planning` and `status=blocked` or `status=failed`
+
+For execution:
+
+- terminal success is `phase=execution` and `status=completed`, with `record/report.md` present
+- terminal failure is `phase=execution` and `status=blocked` or `status=failed`
+
+The wrapper should stop polling when a terminal condition is reached.
 
 ## Invocation Contract
 
@@ -230,7 +412,7 @@ At minimum, the Python control layer is responsible for:
 - ensuring the orchestrator is launched with an unambiguous current run context
 - ensuring execution happens inside the contained bench work surface
 - exposing run artifacts, logs, and bench state for inspection after execution
-- failing closed when the effective runtime configuration does not match the expected unattended capability profile
+- ensuring OpenCode execution is scoped to the active `/runs/<run-id>/` root
 
 ### Orchestrator Responsibilities
 
@@ -271,22 +453,18 @@ The subagents execute within the run.
 
 When responsibility is ambiguous, prefer the narrower authority boundary.
 
-## Agent Capability Tiers
+## Execution Scope
 
-Not all agents need the same level of access.
+Containment is mandatory for execution-capable roles. Execution happens inside the containerized Lab runtime, rooted in the in-container bench for the current run.
 
-The system assumes three broad capability tiers:
+The runtime exposes broad tool and shell capability inside the container, while OpenCode remains scoped to the active `/runs/<run-id>/` workspace.
 
-1. Artifact agents
-   - read and write files only
-2. Limited-execution agents
-   - mostly file-based, with an explicit declared toolbox inside the run-scoped workspace
-3. Full-execution agents
-   - can use a dedicated execution environment when required
+The safety model is therefore:
 
-Containment is mandatory for execution-capable roles. Execution happens inside the containerized Lab runtime, rooted in the in-container bench for the current run. Inside that contained environment, Lab may expose the tools and shell surface needed for the run.
-
-For unattended runs, Lab provides a declared capability profile for the contained runtime and fails before launch when the effective runtime configuration does not match that profile.
+- broad execution capability is acceptable inside the container
+- the active run root is the intended writable execution boundary
+- each run owns its own isolated `/runs/<run-id>/` tree
+- the container is disposable and can be recreated from the image when needed
 
 ## Reusable Agent Definitions
 
@@ -446,7 +624,9 @@ Parallel agents should not share the same writable execution environment.
 
 Where agents need real execution capability, each parallel execution unit should have its own isolated working area and should write logs and artifacts only to its designated output locations.
 
-For each run, the preferred isolated working area is the run-specific `bench/` directory under `.ai-lab/<run-id>/bench/` inside the contained Lab runtime.
+For each run, the isolated working area is the run-specific `bench/` directory under `/runs/<run-id>/bench/` inside the contained Lab runtime. The exported `.ai-lab/<run-id>/bench/` directory is the copied-out durable record of that remote bench after execution.
+
+The current isolation model is one run directory per run. Each run owns its own `record/`, `bench/`, and `artifacts/` directories, and execution-capable processes should treat that run root as their writable boundary.
 
 ## Review Flow
 
@@ -463,8 +643,6 @@ The high-level flow is:
 
 The design still leaves open:
 
-- the exact client-side transport for invoking the contained runtime
-- the exact mechanism for copying project contents into the bench and copying result artifacts back out
 - the exact client-visible relationship between `.opencode/`, `.ai-lab/`, and the containerized runtime
 - exact agent roster
 - exact gate rules

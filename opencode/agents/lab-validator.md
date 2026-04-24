@@ -2,7 +2,8 @@
 description: Reviews run outputs, runs selected checks when needed, and writes explicit validation result artifacts.
 mode: subagent
 permission:
-  bash: allow
+  bash:
+    "*": ask
   edit:
     "*": ask
 ---

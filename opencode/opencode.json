@@ -10,7 +10,7 @@
       "lab-*": "allow"
     },
     "bash": {
-      "*": "allow"
+      "*": "ask"
     },
     "edit": {
       "*": "ask"

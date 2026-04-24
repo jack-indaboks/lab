@@ -97,3 +97,13 @@
 - moved the Lab-owned OpenCode files into the repo-owned `opencode/` surface by relocating `agents/` and `opencode.json` under `opencode/`
 - added the initial Python project surface with `pyproject.toml` and the `lab/` package entrypoint, replacing the old shell executable in `bin/ai-lab`
 - updated `README.md` and the orchestrator prompt to use the repo-owned `opencode/` surface, the standalone clone-install-run model, and the canonical run-rooted runtime shape
+*Commit: b666ab8 python + docker shape*
+
+## 2026-04-02
+
+- realigned `lab/control.py` to the canonical run-rooted `.ai-lab/<run-id>/record/` and `bench/` layout instead of the older split `runs/` and `benches/` model
+- updated run discovery, run artifact paths, and bench setup behavior so the control layer now creates `record/run.json`, `record/timeline.ndjson`, and `record/brief.md` under the canonical run directory
+- changed `lab/control.py` to launch OpenCode per process from the current `.ai-lab/<run-id>/` root instead of the project root, keeping the process boundary aligned with the run directory
+- added fail-closed projection-drift checks in `lab/control.py` so unattended launch now verifies the repo-owned OpenCode surface and effective agent roster before execution begins
+- moved the remaining effective OpenCode workspace boundary onto the run directory by running the agent-roster preflight from `.ai-lab/<run-id>/` and passing run-local attached file paths such as `record/brief.md`
+- made bench mode mandatory for unattended execution in `lab/control.py` by requiring `Execution Mode: bench` at run start and failing closed when a plan still declares `artifact`

@@ -5,7 +5,8 @@ permission:
   task:
     "*": deny
     "lab-*": allow
-  bash: allow
+  bash:
+    "*": ask
   edit:
     "*": ask
 ---
