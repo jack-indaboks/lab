@@ -7,23 +7,8 @@
 !.env.example
 /secrets/
 
-# Local runtime noise
-/.ai-lab/
-/runs/
-/tmp/
-/temp/
-/cache/
-
-# Local OpenCode projections if created during testing
-/.opencode/
-/tui.json
-
 # Ad hoc logs
 *.log
-
-# Python cache
-__pycache__/
-*.pyc
 
 # Local reference imports and private analysis notes
 /.imports/

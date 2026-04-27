@@ -107,3 +107,11 @@
 - added fail-closed projection-drift checks in `lab/control.py` so unattended launch now verifies the repo-owned OpenCode surface and effective agent roster before execution begins
 - moved the remaining effective OpenCode workspace boundary onto the run directory by running the agent-roster preflight from `.ai-lab/<run-id>/` and passing run-local attached file paths such as `record/brief.md`
 - made bench mode mandatory for unattended execution in `lab/control.py` by requiring `Execution Mode: bench` at run start and failing closed when a plan still declares `artifact`
+*Commit: a22a2ef pre-agent-platform*
+
+## 2026-04-27
+
+- pivoted Lab from the retired local control-layer architecture to the current instruction-and-tool-contract model operating on agent-platform
+- rewrote `README.md`, `DESIGN.md`, `ROADMAP.md`, and `DEVELOPMENT.md` to align the repo canon with the new Lab definition and phase model
+- removed the superseded Python control-layer package, `pyproject.toml`, and the repo-owned OpenCode prompt/config surface
+- simplified the repository to the current docs-first implementation state and trimmed `.gitignore` to match the removed runtime-specific and Python-specific local noise

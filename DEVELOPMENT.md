@@ -4,92 +4,43 @@ This document defines maintainer-facing development workflow for the Lab source 
 
 Use this file for:
 - source-of-truth maintainer workflow
-- source and projection workflow
 - testing and debugging workflow
 - document-role rules and update discipline
 
 ## Document Roles
 
-- `README.md`: current state and current usage surface
-- `DESIGN.md`: intended final design of the system
-- `ROADMAP.md`: live work milestones and release milestones between the current state and the design vision
+- `README.md`: current state and public project overview
+- `DESIGN.md`: intended design of Lab
+- `ROADMAP.md`: live work phases and milestones toward the intended design
 - `CHANGELOG.md`: completed changes, including roadmap updates
 - `DEVELOPMENT.md`: maintainer-facing workflow, testing practice, and document boundaries
 
-## Standalone Repo Shape
+## Implementation Guidance
 
-The Lab source repo is a standalone application repo. It is not structured as a project-local `.opencode` projection.
+`DESIGN.md` and `ROADMAP.md` are the source of truth for the Lab surface under development.
 
-The minimal accepted repo shape for the current POC is:
+When changing behavior:
 
-```text
-lab/
-  README.md
-  DESIGN.md
-  ROADMAP.md
-  DEVELOPMENT.md
-  CHANGELOG.md
-  pyproject.toml
-  lab/
-    __main__.py
-    cli.py
-    control.py
-  opencode/
-```
+- prefer changes that move the implementation toward the intended Lab design
+- prefer subtraction over extension when code or structure no longer serves that design
+- do not let incidental implementation details harden into project direction without being reflected in `DESIGN.md`
 
-Interpretation:
-
-- repo-root documents remain project-level files
-- `pyproject.toml` is the Python project manifest for running and installing Lab
-- `lab/` is the Python package that contains the Lab control-layer code and executable entrypoint
-- `opencode/` is the repo-owned surface for Lab's OpenCode-related files
-- runtime-created state such as runs, records, and benches is not part of the checked-in source structure
-
-This shape is deliberately minimal. It is intended to support the basic test model:
-
-1. spin up a generic Ubuntu container
-2. clone the Lab repo
-3. install dependencies
-4. run Lab
-
-## Source And Projection Workflow
-
-Lab development uses two surfaces:
-- the canonical Lab source repo
-- a disposable project-local `.opencode/` projection used to exercise Lab in a real target repo
-
-The canonical source repo is the source of truth.
-The disposable projection is a test surface, not a second canon.
-
-Default rule:
-- fix durable Lab behavior in the canonical source repo
-- use the disposable projection to reproduce bugs and test behavior in realistic downstream context
-
-When the cause of a bug is still uncertain, use this workflow:
-
-1. Reproduce the bug in the disposable project-local projection.
-2. Make the smallest experimental fix in the projection.
-3. If the fix proves correct and reflects intended Lab behavior, immediately upstream the exact change to the canonical source repo.
-4. Refresh the disposable projection from source.
-5. Re-test from the refreshed projection, not from the hand-edited projection.
-
-Rules:
-- do not leave durable behavior changes only in a disposable projection
-- do not treat projection-local success as canonical success until the refreshed projection reproduces it from source
-- use projection-only edits for investigation, not as a shadow fork of the source repo
+When a design question is unsettled, resolve the intended behavior in the project documents before treating an implementation detail as authoritative.
 
 ## Testing And Debugging Workflow
 
-- prefer realistic project-local testing over abstract prompt review once a behavior reaches runtime questions
-- do not resume end-to-end testing until the run directory is the agent workspace boundary and arbitrary host-shell access is out of the run path
-- do not treat the live project root as the normal agent workspace; the run directory is the intended laboratory surface for every run, with `record/` and `bench/` serving different roles inside it
+Favor tests and debugging steps that confirm the intended Lab behavior with the smallest useful check.
+
+Rules:
+
+- prefer the smallest test or inspection that confirms the current design intent
+- prefer realistic end-to-end checks when validating behavior that is meant to define the supported Lab surface
 - when a failure is ambiguous, isolate the smallest failing step before widening the fix
 - treat permission failures, missing artifacts, and state-corruption issues as first-class bugs rather than operator noise
-- for execution-capable Lab agents, prefer ecosystem-provided capabilities that stay scoped to the run workspace; do not normalize arbitrary host-shell access, and do not plan on writing a bespoke simulated shell for MVP
-- for unattended runs, `ask` is not an acceptable capability model; use declared allow/deny profiles and projection-drift checks instead
-- when defining the blessed tool surface, prefer cross-platform capabilities assembled from the runtime ecosystem over bash-only assumptions
+- when defining the Lab tool surface, prefer explicit tool contracts over ambient assumptions
+- for execution-capable Lab agents, prefer ecosystem-provided capabilities over bespoke simulation work
+- when an implementation detail conflicts with the current design, follow the current design
 - preserve auditability: debugging should make the system easier to inspect, not more magical
-- after confirming a fix in a projection, re-test from a refreshed projection sourced from canon
 
 ## Documentation Update Discipline
 
@@ -103,7 +54,7 @@ Rules:
 
 - `CHANGELOG.md` is append-only
 - add new entries; do not rewrite prior history except to correct clear factual errors
-- do not add changelog entries for routine roadmap checkbox changes or wording cleanup unless they reflect a substantive project decision or completed body of work
+- do not add changelog entries for routine roadmap checkbox changes or minor wording edits unless they reflect a substantive project decision or completed body of work
 - AI drafting workflow is: discuss the concept in chat, draft language in the document, refine the language in chat while editing the document, then add a changelog entry only after the wording is accepted
 
 ## Roadmap Rules
@@ -113,10 +64,3 @@ Rules:
 - completed work and roadmap updates are recorded in `CHANGELOG.md`
 - completed phases do not remain in `ROADMAP.md`
 - when a phase is complete, remove it from `ROADMAP.md` and release if applicable
-
-## Open Questions
-
-- questions always begin in chat
-- only explicitly tabled unresolved decisions belong in the `Open Questions` section of `ROADMAP.md`
-- nothing is added to `Open Questions` without explicit direction from the project owner
-- random ideas, clarifications, and speculative branches do not belong there

@@ -1,118 +1,60 @@
 # Lab Roadmap
 
-This roadmap tracks the work milestones and release milestones between the current Lab scaffold and the design vision described in `DESIGN.md`.
+This roadmap tracks Lab work only.
+
+This roadmap focuses on the Lab instruction layer, role definitions, tool contracts, validation behavior, artifact expectations, and workflow described in `DESIGN.md`.
 
 ## POC (`0.0.1`)
 
-Goal: a fresh clone of the template can be configured, run end to end, and produce a usable report.
+Goal: establish the full Lab skeleton end to end.
 
-- [x] Define the initial brief contract and document the required meanings.
-- [x] Define the initial plan contract and required sections.
-- [x] Define the deterministic `.ai-lab` run directory contract.
-- [x] Define minimal validator result levels and decision policy.
-- [x] Define the minimum final report rubric for objective, changes, validation status, evidence, unresolved questions, and next action.
-- [x] Define the CLI, control layer, orchestrator, and subagent boundary contract for run setup, state updates, delegation, and stopping behavior.
-- [x] Tighten the first-pass agent prompts so each role has explicit read/write targets and stop conditions.
-- [x] Implement the first `ai-lab` command surface around OpenCode.
-- [x] Reframe the canon around the bench-first laboratory model.
-- [x] Define the run-rooted workspace layout with `record/` and `bench/` subdirectories.
-- [x] Converge architecture and containment.
-  - Reflect the contained, bench-first runtime direction in canon.
-  - Keep Lab's container setup separate from downstream project containers.
-  - Keep track of the runtime requirements that will define Lab's canonical container surface later.
-  - Reduce the remaining work in this phase to contained implementation rather than unresolved architecture.
-  - [x] Establish Lab repo structure and docs for the POC implementation work.
-    - [x] Define the minimal standalone repo shape for Lab as an application repo rather than a project-local `.opencode` projection.
-    - [x] Add the Python project surface needed to run Lab directly after clone.
-    - [x] Move the Lab executable into the Python control-layer entrypoint.
-    - [x] Relocate Lab-owned OpenCode files into a repo-owned surface that does not assume project-root `.opencode` placement.
-    - [x] Update docs to describe the standalone clone-install-run path.
-- [x] Reconstruct and canonize the current Lab stack design after data loss.
-  - Reconstructed the stack from top-level architecture through wrapper flow and remote state.
-  - Reconfirmed what belongs to Lab, what belongs to local dev scaffolding, and what belongs to downstream project infrastructure.
-  - Canonized the control path, transport, containment model, runtime boundaries, and state surfaces in `DESIGN.md`.
-- [ ] Establish the runtime and POC execution surface.
-  - [ ] Define the contained runtime shape for the local POC.
-  - [ ] Define how Lab uses Lima versus downstream project containers during local development.
-  - [ ] Document the minimum Lima and Docker bring-up path for a Lab run host.
-  - [ ] Decide how the Lab source, runtime bindings, and run workspace enter the contained environment.
-  - [x] Realign the control layer to create and manage the canonical `.ai-lab/<run-id>/record/` and `bench/` layout.
-  - [x] Launch OpenCode per process from the run root.
-  - [x] Add projection-drift checks before unattended launch.
-  - [x] Make the run directory the workspace root for unattended runs.
-  - [x] Make the bench the execution boundary for unattended runs.
-  - [ ] Validate the Python control layer inside the contained runtime.
-  - [ ] Produce a usable `record/plan.md` from `ai-lab plan <brief>` inside the contained runtime.
-  - [ ] Produce a usable `record/report.md` from `ai-lab run <slug>` inside the contained runtime.
-  - [ ] Preserve logs, validation outputs, and invocation artifacts under `.ai-lab/<run-id>/record/`.
-- [ ] Reproduce a single Digest slice.
-  - [ ] Run one bounded Digest slice through Lab.
-  - [ ] Produce the expected artifacts and validation outputs.
-  - [ ] Document the remaining blockers clearly.
+At this phase, Lab should be able to accept a brief and start state, produce a reviewable plan, proceed from an approved plan into execution, and return artifacts plus a final report. The focus is on establishing the complete working skeleton.
 
-## Local Hardening
+- [ ] Define the minimum brief contract.
+- [ ] Define the minimum start-state handoff contract.
+- [ ] Define the minimum plan contract for review.
+- [ ] Define the minimum plan-acceptance step between planning and execution.
+- [ ] Define the minimum final report contract.
+- [ ] Define the minimum artifact return contract.
+- [ ] Define the minimum orchestrator instructions.
+- [ ] Define the minimum worker role instructions.
+- [ ] Define the minimum validator role instructions.
+- [ ] Define the minimum reporter behavior.
+- [ ] Define the initial tool contract by role.
+- [ ] Define the minimum validation behavior needed for end-to-end runs.
+- [ ] Run Lab through the complete flow: brief -> plan -> approved plan -> execution -> artifacts -> report.
+- [ ] Reproduce at least one bounded real-world work slice through that flow.
+- [ ] Document the work needed to carry Lab from skeleton status into real project use.
 
-Goal: make the template reliable enough for repeated local use and clearer iteration.
+## MVP (`0.1.0`)
 
-- [ ] Define the unattended execution defaults for contained runs.
-- [ ] Define how broad in-container tool access is applied and constrained by `/runs/<run-id>/`.
-- [ ] Refine the plan artifact format.
-- [ ] Define the run metadata format.
-- [ ] Define the validator result format.
-- [ ] Define the report format for human review.
-- [ ] Add a lightweight preflight registry for env requirements, protected paths, and mutation guardrails.
-- [ ] Add a structured validation registry for default result handling and recommended checks.
-- [ ] Add schemas for stable Lab registries once their shapes settle.
-- [ ] Revise orchestrator, worker, validator, and reporter prompts based on POC findings.
-- [ ] Refine run ingress and egress rules for copying project contents into the bench and returning result artifacts.
-- [ ] Clarify the client-visible relationship between project-local `.opencode/`, `.ai-lab/`, and the contained runtime.
+Goal: make Lab useful for real projects while continuing to mature toward broader rollout.
 
-## Template Readiness (`0.1.0`)
+At this phase, Lab should save time through repeatable real-project use. Agent definitions and tool contracts should be reliable enough for regular use on real work while the experience continues to mature.
 
-Goal: first experimental release of the template for others to instantiate and try.
+- [ ] Refine the brief contract until it supports real project scoping without constant reinterpretation.
+- [ ] Refine the plan contract until plans are reliably reviewable and actionable.
+- [ ] Refine orchestrator behavior so delegation decisions are predictable enough for repeated use.
+- [ ] Refine worker role definitions so common execution tasks succeed without excessive rework.
+- [ ] Refine validator behavior so findings materially improve outcomes rather than adding noise.
+- [ ] Refine reporter behavior so final reports are concise, legible, and useful for handback.
+- [ ] Tighten tool contracts so role capabilities are explicit and dependable.
+- [ ] Define how blocked work, retries, and clarification needs are surfaced during a run.
+- [ ] Verify that Lab can complete repeated real-project slices with acceptable overhead.
+- [ ] Verify that Lab's outputs are organized and reviewable enough for downstream use.
+- [ ] Document the operating guidance for MVP use and the improvements targeted for v1.
 
-- [ ] Make the template structure and instance model clear for other users.
-- [ ] Make CLI usage understandable without private context.
-- [ ] Define the minimum setup steps for a new instance.
-- [ ] Decide which narrow operator-facing commands belong beyond `plan` and `run`.
-- [ ] Document current limitations and rough edges explicitly.
-- [ ] Verify repeatable end-to-end use outside the original development environment.
+## v1 (`1.0.0`)
 
-## External Trial
+Goal: make Lab complete and stable enough to roll out to other users and support as a real offering.
 
-Goal: learn from use in more than one downstream environment and project shape.
+At this phase, beta learning should already be complete. Lab's core behavior should be stable, teachable, supportable, and ready for broader use.
 
-- [ ] Validate Lab against more than one project shape.
-- [ ] Identify which parts of the agent roster are genuinely shared.
-- [ ] Identify which parts should remain project-specific.
-- [ ] Refine template guidance for project-level `.opencode` instances.
-- [ ] Capture issues that only emerge outside the original development context.
-
-## Release Hardening
-
-Goal: turn lessons from downstream experimentation into a stronger template.
-
-- [ ] Define the client-to-runtime transport for Lab runs.
-- [ ] Capture the canonical container surface for a future turnkey Lab image.
-- [ ] Improve continuity across editor restarts.
-- [ ] Refine logging and artifact preservation.
-- [ ] Add safer defaults for execution-capable roles.
-- [ ] Add cleanup behavior for noisy runs.
-
-## Portability Boundary
-
-Goal: keep Lab canon portable while making runtime bindings clearer.
-
-- [ ] Separate Lab canon from runtime-specific binding concerns more explicitly if needed.
-- [ ] Document the minimum binding contract for additional runtimes.
-- [ ] Decide whether runtime adapters should remain handwritten or become generated.
-
-## Stable Release (`1.0.0`)
-
-Goal: first stable, full-featured release of the template after local and downstream testing.
-
-- [ ] Stabilize the command surface.
-- [ ] Stabilize the instance model.
-- [ ] Stabilize the run lifecycle and report expectations.
-- [ ] Finalize the minimum supported template capabilities.
-- [ ] Close the largest known gaps between the implementation and `DESIGN.md`.
+- [ ] Stabilize the Lab usage model for broader adoption.
+- [ ] Stabilize the Lab instruction set and role definitions for broader use.
+- [ ] Stabilize the tool-contract surface that supported Lab depends on.
+- [ ] Stabilize artifact and report expectations for supported use.
+- [ ] Verify that Lab can be adopted outside the original author environment.
+- [ ] Document the supported operating model clearly enough for rollout and support.
+- [ ] Define which parts of Lab are canonical and which parts are expected to vary by deployment.
+- [ ] Close the largest remaining gaps between real behavior and `DESIGN.md`.
