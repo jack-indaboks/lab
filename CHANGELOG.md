@@ -107,3 +107,4 @@
 - added fail-closed projection-drift checks in `lab/control.py` so unattended launch now verifies the repo-owned OpenCode surface and effective agent roster before execution begins
 - moved the remaining effective OpenCode workspace boundary onto the run directory by running the agent-roster preflight from `.ai-lab/<run-id>/` and passing run-local attached file paths such as `record/brief.md`
 - made bench mode mandatory for unattended execution in `lab/control.py` by requiring `Execution Mode: bench` at run start and failing closed when a plan still declares `artifact`
+*Commit: a22a2ef pre-agent-platform*
